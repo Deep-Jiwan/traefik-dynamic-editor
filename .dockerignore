@@ -1,0 +1,19 @@
+# Ignore Go build outputs and editor files
+bin/
+**/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Node / frontend build artifacts
+node_modules/
+dist/
+
+# Git
+.git
+.gitignore
+
+# OS
+*.log
+*.tmp

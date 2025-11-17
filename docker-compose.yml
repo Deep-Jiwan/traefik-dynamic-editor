@@ -1,34 +1,20 @@
 version: '3.8'
-
 services:
-  traefik-editor:
-    build: ./backend
-    container_name: traefik-editor
+  traefik-dynamic-backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: traefik-dynamic-editor:latest
+    container_name: traefik-dynamic-backend
     ports:
-      - "8080:8080"
-    volumes:
-      - ./dynamic:/dynamic
-      - ./frontend:/app/frontend
+      - "8010:8010"
     environment:
-      - DYNAMIC_CONFIG_PATH=/dynamic/dynamic.yml
-      - PORT=8080
+      - PORT=8010
+      - DYNAMIC_CONFIG_PATH=../dynamic/dynamic.yml
+      - TRAEFIK_CONFIG_PATH=../config/traefik.yml
+    volumes:
+      - ./dynamic:/app/dynamic:rw
+      - ./config:/app/config:rw
+      # Frontend is included in the image; do not mount it as a volume so
+      # the container serves the packaged frontend files.
     restart: unless-stopped
-
-  # Optional: Include Traefik itself for testing
-  # Uncomment if you want to test with a full Traefik instance
-  # traefik:
-  #   image: traefik:v2.10
-  #   container_name: traefik
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #     - "8081:8080"  # Traefik dashboard
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #     - ./config/traefik.yml:/traefik.yml:ro
-  #     - ./dynamic:/dynamic:ro
-  #     - ./certs:/var/traefik/certs
-  #   environment:
-  #     - CF_API_EMAIL=${CF_API_EMAIL}
-  #     - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
-  #   restart: unless-stopped
