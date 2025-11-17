@@ -1,28 +1,28 @@
 http:
     routers:
         grafana:
-            rule: Host(`grafana.deep.adgone.co.tz`)
+            rule: Host(`grafana.sample.com`)
             entryPoints:
                 - websecure
             service: grafana
             tls:
                 certResolver: cloudflare
         influx-router:
-            rule: Host(`influx.deep.adgone.co.tz`)
+            rule: Host(`influx.sample.com`)
             entryPoints:
                 - websecure
             service: influx-service
             tls:
                 certResolver: cloudflare
         openspeedtest:
-            rule: Host(`speednew.deep.adgone.co.tz`)
+            rule: Host(`speednew.sample.com`)
             entryPoints:
                 - websecure
             service: openspeedtest
             tls:
                 certResolver: cloudflare
         portainer:
-            rule: Host(`portainer.deep.adgone.co.tz`)
+            rule: Host(`portainer.sample.com`)
             entryPoints:
                 - websecure
             service: portainer

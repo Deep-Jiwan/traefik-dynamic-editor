@@ -31,9 +31,9 @@ providers:
 certificatesResolvers:
   cloudflare:
     acme:
-      email: "ashish.jiwan3007@gmail.com"
-      storage: "/var/traefik/certs/acme.json"
-      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      email: ""
+      storage: ""
+      caServer: ""
       keyType: EC256
       dnsChallenge:
         provider: cloudflare
