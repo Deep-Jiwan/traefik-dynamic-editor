@@ -1,0 +1,38 @@
+# Backend binaries
+backend/app
+backend/traefik-editor
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Certificates
+*.pem
+*.key
+*.crt
+certs/
+acme.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

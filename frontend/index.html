@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traefik Dynamic Config Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="bg-custom-dark min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h1 class="text-4xl font-bold text-white">Traefik Config Editor</h1>
+                    <p class="text-white mt-2">Manage your dynamic routing configuration</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="status-indicator" class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
+                        <div class="w-2 h-2 rounded-full bg-gray-400" id="status-dot"></div>
+                        <span class="text-sm text-gray-600" id="status-text">Connecting...</span>
+                    </div>
+                    <button onclick="showAddRouterModal()" class="bg-custom-teal hover:bg-custom-teal-dark text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        + Add Router
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Entry Points Section -->
+        <div class="bg-custom-dark p-6 mb-8">
+            <h2 class="text-xl font-bold text-white mb-4">Entry Points</h2>
+            <div id="entrypoints-list" class="grid grid-cols-3 gap-4">
+                <!-- Entry points will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Routers Table -->
+        <div class="bg-custom-table rounded-lg shadow-md overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-custom-table border-b border-custom-separator">
+                    <tr>
+                        <th class="px-6 py-5 text-left text-xs font-medium text-subtle uppercase tracking-wider">Router Name</th>
+                        <th class="px-6 py-5 text-left text-xs font-medium text-subtle uppercase tracking-wider">Host</th>
+                        <th class="px-6 py-5 text-left text-xs font-medium text-subtle uppercase tracking-wider">Service</th>
+                        <th class="px-6 py-5 text-left text-xs font-medium text-subtle uppercase tracking-wider">Entry Points</th>
+                        <th class="px-6 py-5 text-left text-xs font-medium text-subtle uppercase tracking-wider">TLS</th>
+                        <th class="px-6 py-5 text-right text-xs font-medium text-subtle uppercase tracking-wider">Actions</th>
+                        <th class="px-6 py-5 text-left text-xs font-medium text-subtle uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="routers-container" class="divide-y divide-gray-200">
+                    <!-- Routers will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-16">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <h3 class="mt-4 text-lg font-medium text-gray-900">No routers configured</h3>
+            <p class="mt-2 text-gray-500">Get started by adding your first router</p>
+            <button onclick="showAddRouterModal()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                + Add Router
+            </button>
+        </div>
+    </div>
+
+    <!-- Add/Edit Router Modal -->
+    <div id="router-modal" class="hidden fixed inset-0 flex items-center justify-center z-50">
+        <div class="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-md transition-all duration-300 ease-in-out" onclick="closeModal()"></div>
+        <div class="relative bg-custom-table rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out transform">
+            <div class="p-6 border-b border-custom-separator">
+                <div class="flex items-center justify-between">
+                    <h2 id="modal-title" class="text-2xl font-bold text-white">Add Router</h2>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <form id="router-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-white mb-2">Router Name</label>
+                    <input type="text" id="router-name" class="w-full px-4 py-2 bg-custom-dark border border-custom-separator rounded-lg focus:ring-2 focus:ring-custom-teal focus:border-transparent text-white" placeholder="my-service-router" required>
+                    <p class="text-xs text-subtle mt-1">Unique identifier for this router</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-white mb-2">Host Rule</label>
+                    <input type="text" id="router-host" class="w-full px-4 py-2 bg-custom-dark border border-custom-separator rounded-lg focus:ring-2 focus:ring-custom-teal focus:border-transparent text-white" placeholder="example.com" required>
+                    <p class="text-xs text-subtle mt-1">Domain name for this service</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-white mb-2">Service Name</label>
+                    <input type="text" id="router-service" class="w-full px-4 py-2 bg-custom-dark border border-custom-separator rounded-lg focus:ring-2 focus:ring-custom-teal focus:border-transparent text-white" placeholder="my-service" required>
+                    <p class="text-xs text-subtle mt-1">Name of the service to route to</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-white mb-2">Backend URL</label>
+                    <input type="url" id="service-url" class="w-full px-4 py-2 bg-custom-dark border border-custom-separator rounded-lg focus:ring-2 focus:ring-custom-teal focus:border-transparent text-white" placeholder="http://192.168.1.100:8080" required>
+                    <p class="text-xs text-subtle mt-1">Internal service URL (http://ip:port)</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-white mb-2">Entry Points</label>
+                    <div id="entrypoints-container" class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="entrypoint" value="web" class="w-4 h-4 text-custom-teal border-custom-separator rounded focus:ring-custom-teal">
+                            <span class="ml-2 text-sm text-white">HTTP (web)</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="entrypoint" value="websecure" checked class="w-4 h-4 text-custom-teal border-custom-separator rounded focus:ring-custom-teal">
+                            <span class="ml-2 text-sm text-white">HTTPS (websecure)</span>
+                        </label>
+                    </div>
+                    <div class="mt-3 flex gap-2">
+                        <input type="text" id="new-entrypoint-name" class="flex-1 px-3 py-2 text-sm bg-custom-dark border border-custom-separator rounded-lg focus:ring-2 focus:ring-custom-teal focus:border-transparent text-white" placeholder="custom-port">
+                        <button type="button" onclick="addEntryPoint()" class="px-3 py-2 text-sm bg-custom-hover hover:bg-custom-dark text-white rounded-lg transition-colors">
+                            + Add Custom
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="tls-enabled" checked class="w-4 h-4 text-custom-teal border-custom-separator rounded focus:ring-custom-teal">
+                        <span class="ml-2 text-sm font-medium text-white">Enable TLS</span>
+                    </label>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" class="flex-1 bg-custom-teal hover:bg-custom-teal-dark text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        Save Router
+                    </button>
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-custom-separator rounded-lg text-white hover:bg-custom-hover font-medium transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="hidden fixed inset-0 flex items-center justify-center z-50">
+        <div class="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-md transition-all duration-200 ease-in-out" onclick="closeDeleteModal()"></div>
+        <div class="relative bg-custom-table text-white rounded-xl shadow-2xl max-w-md w-full mx-4 transition-all duration-300 ease-in-out transform">
+            <div class="p-6">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-lg mb-4">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-white text-center mb-2">Delete Router</h3>
+                <p class="text-sm text-subtle text-center mb-6">Are you sure you want to delete router "<span id="delete-router-name" class="font-semibold"></span>"? This action cannot be undone.</p>
+                <div class="flex gap-3">
+                    <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2 border border-custom-separator rounded-lg text-default hover:bg-custom-hover font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button onclick="confirmDeleteRouter()" class="flex-1 bg-delete-matte hover:bg-delete-matte-dark text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container (top-right) -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Load runtime frontend config (edit frontend/config.js to override defaults) -->
+    <script src="config.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
