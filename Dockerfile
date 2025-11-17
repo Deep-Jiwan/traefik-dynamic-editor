@@ -27,11 +27,11 @@ COPY . .
 WORKDIR /src/backend
 # Build for the target architecture. When using `docker buildx --platform` the
 # buildkit engine will set TARGETOS/TARGETARCH/TARGETVARIANT automatically.
-RUN sh -lc 'if [ -n "${TARGETVARIANT}" ] && echo "${TARGETVARIANT}" | grep -q "v7"; then \ 
-            GOARM=7 CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o traefik-dynamic-editor; \ 
-        else \ 
-            CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o traefik-dynamic-editor; \ 
-        fi'
+RUN if [ -n "${TARGETVARIANT}" ] && echo "${TARGETVARIANT}" | grep -q "v7"; then \
+        GOARM=7 CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o traefik-dynamic-editor; \
+    else \
+        CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o traefik-dynamic-editor; \
+    fi
 
 ### Runtime image
 FROM alpine:3.18

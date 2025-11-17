@@ -163,7 +163,27 @@ function checkService(name, host, scheme) {
 
 // WebSocket connection for real-time updates
 function connectWebSocket() {
-    ws = new WebSocket('ws://localhost:8010/api/ws');
+    // Build a WebSocket URL that matches the API base or same-origin.
+    function getWebSocketUrl() {
+        // Allow explicit override via APP_CONFIG.WS_URL
+        if (window.APP_CONFIG && window.APP_CONFIG.WS_URL) return window.APP_CONFIG.WS_URL;
+
+        // If API_BASE is an absolute http(s) URL, derive ws(s) from it and append /ws
+        try {
+            const apiUrl = new URL(API_BASE, window.location.href);
+            const wsProtocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+            // Replace trailing /api or /api/ with /api/ws
+            const wsPath = apiUrl.pathname.replace(/\/api\/?$/, '/api/ws');
+            return wsProtocol + '//' + apiUrl.host + wsPath;
+        } catch (err) {
+            // Fallback to same-origin websocket path
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            return proto + '//' + window.location.host + '/api/ws';
+        }
+    }
+
+    const wsUrl = getWebSocketUrl();
+    ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
         updateStatus('connected', 'Connected');
