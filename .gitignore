@@ -36,3 +36,10 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+
+dynamic.yml
+traefik.yml
+config/traefik.yml
+
+ignore
