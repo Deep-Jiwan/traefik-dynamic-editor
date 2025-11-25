@@ -8,7 +8,7 @@ name: build
 
 steps:
   - name: build-docker-image
-    image: woodpeckerci/plugin-docker:latest
+    image: drillster/drone-docker
     settings:
       repo: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor
       tags:
