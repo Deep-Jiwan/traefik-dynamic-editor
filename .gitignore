@@ -43,3 +43,5 @@ traefik.yml
 config/traefik.yml
 
 ignore
+old_frontend
+frontend/webui

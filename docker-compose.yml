@@ -9,7 +9,7 @@ services:
         TARGETOS: linux
         TARGETARCH: arm64
         TARGETVARIANT: ""
-    image: traefik-dynamic-editor:latest
+    image: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:build
     container_name: traefik-dynamic-backend
     ports:
       - "8010:8010"

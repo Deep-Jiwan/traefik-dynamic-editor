@@ -1,0 +1,42 @@
+@import "tailwindcss";
+/* Traefik Dynamic Config Editor Styles */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Checkbox styling for dark theme */
+input[type='checkbox']:checked {
+  accent-color: #2aa2c1;
+}
+
+/* Focus ring colors */
+*:focus-visible {
+  outline: 2px solid #2aa2c1;
+  outline-offset: 2px;
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #081727;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2f3d4d;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a4a5c;
+}
+

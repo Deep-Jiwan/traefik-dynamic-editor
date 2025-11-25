@@ -101,8 +101,8 @@ func main() {
 	// Enable CORS
 	r.Use(corsMiddleware)
 
-	// Serve static files
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir("../frontend")))
+	// Serve static files from the new React frontend
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir("../frontend/editorfront/dist")))
 
 	// Start server
 	port := getEnv("PORT", "8010")
@@ -154,18 +154,6 @@ func updateConfig(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Configuration updated"})
-}
-
-// GET /api/entrypoints - Get entry points from traefik.yml
-func getEntryPoints(w http.ResponseWriter, r *http.Request) {
-	staticConfig, err := readTraefikConfig()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(staticConfig.EntryPoints)
 }
 
 // GET /api/routers - List all routers
@@ -389,6 +377,18 @@ func readConfig() (*TraefikConfig, error) {
 	}
 
 	return &config, nil
+}
+
+// GET /api/entrypoints - Get entry points from traefik.yml
+func getEntryPoints(w http.ResponseWriter, r *http.Request) {
+	staticConfig, err := readTraefikConfig()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(staticConfig.EntryPoints)
 }
 
 // Read Traefik static configuration from traefik.yml

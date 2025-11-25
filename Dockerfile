@@ -1,6 +1,24 @@
 # Multi-stage Dockerfile for Traefik Dynamic Config Editor
-# Builder: compile Go binary
-FROM golang:1.24-alpine AS builder
+
+# Stage 1: Build React frontend
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /src/frontend/editorfront
+
+# Copy frontend package files
+COPY frontend/editorfront/package.json frontend/editorfront/package-lock.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source code
+COPY frontend/editorfront/ ./
+
+# Build the React application
+RUN npm run build
+
+# Stage 2: Build Go backend
+FROM golang:1.24-alpine AS backend-builder
 
 # Allow build args for cross-compilation (buildx sets these automatically)
 ARG TARGETOS=linux
@@ -20,8 +38,8 @@ RUN apk add --no-cache git ca-certificates && \
 
 # Ensure we copy repository into /src (not into /src/backend)
 WORKDIR /src
-# Copy the full repository
-COPY . .
+# Copy the backend source
+COPY backend/ ./backend/
 
 # Build the backend binary
 WORKDIR /src/backend
@@ -39,9 +57,11 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /app/backend
 
-# Copy binary and frontend files
-COPY --from=builder /src/backend/traefik-dynamic-editor .
-COPY --from=builder /src/frontend /app/frontend
+# Copy binary from backend builder
+COPY --from=backend-builder /src/backend/traefik-dynamic-editor .
+
+# Copy built frontend dist files from frontend builder
+COPY --from=frontend-builder /src/frontend/editorfront/dist /app/frontend/editorfront/dist
 
 # Expose port used by the app
 EXPOSE 8010

@@ -1,5 +1,5 @@
 // Frontend runtime configuration
-// Edit this file in development to override defaults, or generate it from `frontend/.env`.
+// Edit this file to override API base URL for development
 (function(){
     // Default: use same origin + /api so it works when served by backend
     var defaultApiBase = window.location.protocol + '//' + window.location.host + '/api';
