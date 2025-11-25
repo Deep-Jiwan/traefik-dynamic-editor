@@ -1,10 +1,10 @@
 services:
-  traefik-dynamic-backend:
+  traefik-dynamic-backend-git:
     platform: linux/arm64
     image: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
     container_name: traefik-dynamic-backend2
     ports:
-      - "8020:8010"
+      - "8010:8010"
     environment:
       - PORT=8010
       - DYNAMIC_CONFIG_PATH=../dynamic/dynamic.yml
