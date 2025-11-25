@@ -9,18 +9,20 @@ name: build
 steps:
   - name: build-docker-image
     image: plugins/docker:linux-arm64
+    environment:
+      TAG_SHA: ${DRONE_COMMIT_SHA}   # capture commit SHA in env variable
     settings:
       repo: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor
       tags:
         - latest
-        - ${DRONE_COMMIT_SHA}
         - autobuild
+        - ${TAG_SHA}                  # expand commit SHA here
       dockerfile: Dockerfile
       registry: ghcr.io
       platforms:
         - linux/arm64
+      purge: false                     # keep image locally after build
       username:
         from_secret: ghcr_username
       password:
         from_secret: ghcr_token
-        
