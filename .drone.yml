@@ -46,4 +46,5 @@ steps:
         - curl -L -o docker-compose-deploy.yml https://raw.githubusercontent.com/Deep-Jiwan/traefik-dynamic-editor/main/docker-compose-deploy.yml
         - echo "Deploying stack..."
         - docker compose -f docker-compose-deploy.yml pull
-        - docker compose -f docker-compose-deploy.yml up -d --force-recreate
+        - docker compose -f docker-compose-deploy.yml up -d --force-recreate --remove-orphans
+
