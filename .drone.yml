@@ -7,6 +7,31 @@ type: docker
 name: build
 
 steps:
+  - name: build-docker-image
+    image: plugins/docker:linux-arm64
+    settings:
+      repo: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA}
+        - autobuild
+      dockerfile: Dockerfile
+      registry: ghcr.io
+      platforms:
+        - linux/arm64
+      username:
+        from_secret: ghcr_username
+      password:
+        from_secret: ghcr_token
+
+      # Enable Docker layer caching
+      buildkit: true
+      cache_from:
+        - ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest
+        - ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
+      cache_to:
+        - type=inline
+
   - name: redeploy-stack
     image: appleboy/drone-ssh
     settings:
