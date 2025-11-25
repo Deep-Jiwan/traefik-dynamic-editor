@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  traefik-dynamic-backend:
+    platform: linux/arm64
+    image: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
+    container_name: traefik-dynamic-backend2
+    ports:
+      - "8020:8010"
+    environment:
+      - PORT=8010
+      - DYNAMIC_CONFIG_PATH=../dynamic/dynamic.yml
+      - TRAEFIK_CONFIG_PATH=../config/traefik.yml
+    volumes:
+      - /var/lib/docker/volumes/traefik/dynamic:/app/dynamic:rw
+      - /var/lib/docker/volumes/traefik/config:/app/config:rw
+    restart: unless-stopped

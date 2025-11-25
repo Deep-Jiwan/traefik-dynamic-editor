@@ -17,7 +17,10 @@ steps:
         - autobuild
       dockerfile: Dockerfile
       registry: ghcr.io
+      platforms:
+        - linux/arm64
       username:
         from_secret: ghcr_username
       password:
         from_secret: ghcr_token
+        

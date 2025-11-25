@@ -20,6 +20,11 @@ RUN npm run build
 # Stage 2: Build Go backend
 FROM golang:1.24-alpine AS backend-builder
 
+# Allow build args for cross-compilation (buildx sets these automatically)
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ARG TARGETVARIANT=
+
 WORKDIR /src
 
 # Copy backend module files to allow dependency download before copying entire repo
@@ -38,8 +43,13 @@ COPY backend/ ./backend/
 
 # Build the backend binary
 WORKDIR /src/backend
-# Build for native architecture (no cross-compilation args needed)
-RUN CGO_ENABLED=0 go build -o traefik-dynamic-editor
+# Build for the target architecture. When using `docker buildx --platform` the
+# buildkit engine will set TARGETOS/TARGETARCH/TARGETVARIANT automatically.
+RUN if [ -n "${TARGETVARIANT}" ] && echo "${TARGETVARIANT}" | grep -q "v7"; then \
+        GOARM=7 CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o traefik-dynamic-editor; \
+    else \
+        CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o traefik-dynamic-editor; \
+    fi
 
 ### Runtime image
 FROM alpine:3.18
