@@ -19,10 +19,10 @@ export const RouterRow = ({ name, router, onEdit, onDelete }: RouterRowProps) =>
 
   return (
     <tr className="hover:bg-[hsla(206,100%,50%,0.04)] transition-colors">
-      <td className="px-6 py-5" style={{ width: '15%' }}>
+      <td className="px-6 py-5" style={{ width: '25%' }}>
         <div className="text-sm font-medium text-[hsla(0,0%,100%,0.74)] truncate" title={name}>{name}</div>
       </td>
-      <td className="px-6 py-5" style={{ width: '18%' }}>
+      <td className="px-6 py-5" style={{ width: '24%' }}>
         {host !== 'Unknown' ? (
           <a
             href={`${scheme}://${host}`}
@@ -73,24 +73,26 @@ export const RouterRow = ({ name, router, onEdit, onDelete }: RouterRowProps) =>
           </div>
         )}
       </td>
-      <td className="px-6 py-5 text-right text-sm font-medium" style={{ width: '20%' }}>
-        <button
-          onClick={() => onEdit(name)}
-          className="text-[#2aa2c1] hover:text-[#238a9f] mr-3 inline-flex items-center transition-colors"
-        >
-          <FiEdit2 className="w-4 h-4 mr-1" />
-          Edit
-        </button>
-        <button
-          onClick={() => onDelete(name)}
-          className="inline-flex items-center transition-colors"
-          style={{ color: 'rgb(220, 53, 69)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'rgb(180, 43, 56)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'rgb(220, 53, 69)')}
-        >
-          <FiTrash2 className="w-4 h-4 mr-1" />
-          Delete
-        </button>
+      <td className="px-6 py-5 text-sm font-medium" style={{ width: '14%' }}>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => onEdit(name)}
+            className="text-[#2aa2c1] hover:text-[#238a9f] inline-flex items-center transition-colors whitespace-nowrap"
+          >
+            <FiEdit2 className="w-4 h-4 mr-1" />
+            Edit
+          </button>
+          <button
+            onClick={() => onDelete(name)}
+            className="inline-flex items-center transition-colors whitespace-nowrap"
+            style={{ color: 'rgb(220, 53, 69)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgb(180, 43, 56)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgb(220, 53, 69)')}
+          >
+            <FiTrash2 className="w-4 h-4 mr-1" />
+            Delete
+          </button>
+        </div>
       </td>
       <td className="px-6 py-5" style={{ width: '12%' }}>
         <StatusBadge status={serviceStatus} />

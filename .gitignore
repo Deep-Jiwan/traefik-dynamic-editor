@@ -45,3 +45,5 @@ config/traefik.yml
 ignore
 old_frontend
 frontend/webui
+deploy.sh
+temp
