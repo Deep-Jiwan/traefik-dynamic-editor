@@ -29,6 +29,21 @@ steps:
       cache_from:
         - ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest
         - ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
-
       cache_to:
         - type=inline
+
+  - name: redeploy-stack
+    image: appleboy/drone-ssh
+    settings:
+      host:
+        from_secret: SSH_HOST
+      username:
+        from_secret: SSH_USER
+      key:
+        from_secret: SSH_KEY
+      script:
+        - echo "Downloading latest stack file..."
+        - curl -L -o docker-compose-deploy.yml https://raw.githubusercontent.com/Deep-Jiwan/traefik-dynamic-editor/main/docker-compose-deploy.yml
+        - echo "Deploying stack..."
+        - docker compose -f docker-compose-deploy.yml pull
+        - docker compose -f docker-compose-deploy.yml up -d --force-recreate
