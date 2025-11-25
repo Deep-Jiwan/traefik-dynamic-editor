@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -72,6 +73,11 @@ type Server struct {
 }
 
 func main() {
+	// Log configuration paths on startup
+	log.Printf("Starting Traefik Dynamic Config Editor")
+	log.Printf("Dynamic config path: %s", configPath)
+	log.Printf("Traefik config path: %s", traefikConfigPath)
+
 	// Initialize file watcher
 	var err error
 	fileWatcher, err = fsnotify.NewWatcher()
@@ -383,7 +389,16 @@ func readConfig() (*TraefikConfig, error) {
 func getEntryPoints(w http.ResponseWriter, r *http.Request) {
 	staticConfig, err := readTraefikConfig()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Error reading Traefik config from %s: %v", traefikConfigPath, err)
+		http.Error(w, fmt.Sprintf("Failed to read Traefik config: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if staticConfig.EntryPoints == nil {
+		log.Printf("No entry points found in config file: %s", traefikConfigPath)
+		// Return empty object instead of null
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]EntryPoint{})
 		return
 	}
 
@@ -395,12 +410,24 @@ func getEntryPoints(w http.ResponseWriter, r *http.Request) {
 func readTraefikConfig() (*TraefikStaticConfig, error) {
 	data, err := os.ReadFile(traefikConfigPath)
 	if err != nil {
-		return nil, err
+		// If file doesn't exist, return empty config instead of error
+		if os.IsNotExist(err) {
+			log.Printf("Traefik config file not found at %s, returning empty config", traefikConfigPath)
+			return &TraefikStaticConfig{
+				EntryPoints: make(map[string]EntryPoint),
+			}, nil
+		}
+		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	var config TraefikStaticConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	// Initialize empty map if nil
+	if config.EntryPoints == nil {
+		config.EntryPoints = make(map[string]EntryPoint)
 	}
 
 	return &config, nil
