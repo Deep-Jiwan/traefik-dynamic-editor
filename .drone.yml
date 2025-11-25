@@ -8,7 +8,7 @@ name: build
 
 steps:
   - name: build-docker-image
-    image: drillster/drone-docker
+    image: plugins/docker:linux-arm64
     settings:
       repo: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor
       tags:
