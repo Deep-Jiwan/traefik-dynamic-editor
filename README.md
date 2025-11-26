@@ -161,3 +161,4 @@ Contributions welcome! Looking to
 - Extended testing and checking
 - Extend the configuration options, ability to fully setup traefik end to end.
 - Improve the UI/UX
+- Optimize CI/CD
