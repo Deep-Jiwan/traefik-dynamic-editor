@@ -47,3 +47,5 @@ old_frontend
 frontend/webui
 deploy.sh
 temp
+node_modules
+run-app.ps1

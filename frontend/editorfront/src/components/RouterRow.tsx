@@ -1,4 +1,4 @@
-import { FiEdit2, FiTrash2, FiExternalLink } from 'react-icons/fi'
+import { FiEdit, FiTrash2, FiExternalLink } from 'react-icons/fi'
 import type { Router } from '../types/traefik'
 import { StatusBadge } from './StatusBadge'
 import { useServiceStatus } from '../hooks/useServiceStatus'
@@ -79,7 +79,7 @@ export const RouterRow = ({ name, router, onEdit, onDelete }: RouterRowProps) =>
             onClick={() => onEdit(name)}
             className="text-[#2aa2c1] hover:text-[#238a9f] inline-flex items-center transition-colors whitespace-nowrap"
           >
-            <FiEdit2 className="w-4 h-4 mr-1" />
+            <FiEdit className="w-4 h-4 mr-1" />
             Edit
           </button>
           <button

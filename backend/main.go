@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -96,6 +97,8 @@ func main() {
 	api := r.PathPrefix("/api").Subrouter()
 	api.HandleFunc("/config", getConfig).Methods("GET")
 	api.HandleFunc("/config", updateConfig).Methods("PUT")
+	api.HandleFunc("/yaml", getYAML).Methods("GET")
+	api.HandleFunc("/yaml", updateYAML).Methods("PUT")
 	api.HandleFunc("/ping", pingHandler).Methods("GET")
 	api.HandleFunc("/entrypoints", getEntryPoints).Methods("GET")
 	api.HandleFunc("/routers", listRouters).Methods("GET")
@@ -160,6 +163,49 @@ func updateConfig(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Configuration updated"})
+}
+
+// GET /api/yaml - Get raw YAML configuration
+func getYAML(w http.ResponseWriter, r *http.Request) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/yaml")
+	w.Header().Set("Content-Disposition", "inline")
+	w.Write(data)
+}
+
+// PUT /api/yaml - Update raw YAML configuration
+func updateYAML(w http.ResponseWriter, r *http.Request) {
+	// Read raw YAML body
+	yamlData, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Validate YAML by unmarshaling it
+	var config TraefikConfig
+	if err := yaml.Unmarshal(yamlData, &config); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid YAML: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Write the YAML file directly
+	if err := os.WriteFile(configPath, yamlData, 0644); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to write config: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Notify WebSocket clients of update
+	notifyClients()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "YAML configuration updated"})
 }
 
 // GET /api/routers - List all routers

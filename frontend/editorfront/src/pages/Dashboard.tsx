@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import useSWR from 'swr'
-import { FiPlus, FiAlertTriangle, FiSearch, FiX, FiRefreshCw } from 'react-icons/fi'
+import { FiPlus, FiAlertTriangle, FiSearch, FiX, FiRefreshCw, FiEdit } from 'react-icons/fi'
 import { Helmet } from 'react-helmet-async'
 import { getApiBase } from '../utils/config'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -14,11 +14,13 @@ import { RoutersTable } from '../components/RoutersTable'
 import { RouterRow } from '../components/RouterRow'
 import { EntryPointsList } from '../components/EntryPointsList'
 import { EmptyState } from '../components/EmptyState'
+import { YAMLEditor } from '../components/YAMLEditor'
 
 export const Dashboard = () => {
   const { showToast } = useToast()
   const [isRouterModalOpen, setIsRouterModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isYAMLEditorOpen, setIsYAMLEditorOpen] = useState(false)
   const [editingRouter, setEditingRouter] = useState<string | null>(null)
   const [deletingRouter, setDeletingRouter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -181,17 +183,26 @@ export const Dashboard = () => {
 
           {hasRouters && (
             <>
-              {/* Search Bar */}
-              <div className="mb-4 flex justify-end gap-3">
+              {/* Search Bar & Actions */}
+              <div className="mb-4 flex justify-between gap-3">
                 <button
-                  onClick={handleRefreshStatus}
-                  disabled={isRefreshing}
-                  className="px-4 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white hover:bg-[hsla(206,100%,50%,0.04)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Refresh service status"
+                  onClick={() => setIsYAMLEditorOpen(true)}
+                  className="px-4 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white hover:bg-[hsla(206,100%,50%,0.04)] transition-colors flex items-center gap-2"
+                  title="Edit YAML configuration"
                 >
-                  <FiRefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <FiEdit className="w-4 h-4" />
+                  Edit
                 </button>
-                <div className="relative w-64">
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleRefreshStatus}
+                    disabled={isRefreshing}
+                    className="px-4 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white hover:bg-[hsla(206,100%,50%,0.04)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh service status"
+                  >
+                    <FiRefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </button>
+                  <div className="relative w-64">
                   <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[hsla(0,0%,100%,0.51)] w-4 h-4" />
                   <input
                     type="text"
@@ -208,6 +219,7 @@ export const Dashboard = () => {
                       <FiX className="w-4 h-4" />
                     </button>
                   )}
+                </div>
                 </div>
               </div>
 
@@ -338,6 +350,17 @@ export const Dashboard = () => {
           </div>
         </div>
       </Modal>
+
+      {/* YAML Editor Modal */}
+      <YAMLEditor
+        isOpen={isYAMLEditorOpen}
+        onClose={() => setIsYAMLEditorOpen(false)}
+        onSave={() => {
+          mutateRouters()
+          mutateEntryPoints()
+          showToast('Configuration saved successfully', 'success')
+        }}
+      />
     </>
   )
 }
