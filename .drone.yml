@@ -2,46 +2,45 @@ platform:
   os: linux
   arch: arm64
 
-
 kind: pipeline
 type: docker
 name: build
 
 steps:
-  - name: build-image
-    image: docker:cli
-    environment:
-      DOCKER_BUILDKIT: 1
-    commands:
-      - |
-        docker build \
-          --file dockerfilefast \
-          --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest \
-          --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:${DRONE_COMMIT_SHA} \
-          --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild \
-          --build-arg BUILDKIT_INLINE_CACHE=1 \
-          --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-          --label org.opencontainers.image.revision=${DRONE_COMMIT_SHA} \
-          --label org.opencontainers.image.source=${DRONE_REPO_LINK} \
-          --label org.opencontainers.image.url=${DRONE_REPO_LINK} \
-          .
-
-  - name: push-image
-    image: docker:cli
-    environment:
-      GHCR_USERNAME:
+  - name: build-docker-image
+    image: plugins/docker:linux-arm64
+    pull: if-not-exists          # do not pull step image unless missing
+    settings:
+      repo: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor
+      tags:
+        - latest
+        - ${DRONE_COMMIT_SHA}
+        - autobuild
+      dockerfile: dockerfilefast
+      registry: ghcr.io
+      username:
         from_secret: ghcr_username
-      GHCR_TOKEN:
+      password:
         from_secret: ghcr_token
-    commands:
-      - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-      - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest
-      - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:${DRONE_COMMIT_SHA}
-      - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
-      - docker logout ghcr.io
+
+      # Build platforms (keep arm64)
+      platforms:
+        - linux/arm64
+
+      # Use BuildKit and try to use registry cache + inline cache
+      buildkit: true
+      cache_from:
+        - ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
+      cache_to:
+        - type=inline
+
+      # pass build-args (enable inline cache export in build)
+      build_args:
+        - BUILDKIT_INLINE_CACHE=1
 
   - name: redeploy-stack
     image: appleboy/drone-ssh
+    pull: if-not-exists
     settings:
       host:
         from_secret: SSH_HOST
@@ -53,19 +52,26 @@ steps:
         - echo "Downloading latest stack file..."
         - curl -L -o docker-compose-deploy.yml https://raw.githubusercontent.com/Deep-Jiwan/traefik-dynamic-editor/main/docker-compose-deploy.yml
 
-        - echo "Pulling latest image..."
-        - docker compose -f docker-compose-deploy.yml pull
+        - IMAGE=ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
+        - echo "Checking if image exists locally on the remote host: $IMAGE"
+        - |
+          if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "Image exists locally, skipping compose pull."
+          else
+            echo "Image not found locally — pulling via docker compose..."
+            docker compose -f docker-compose-deploy.yml pull
+          fi
 
-        - echo "Starting temporary container..."
-        - docker run -d --name traefik-dynamic-backend-temp ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
+        - echo "Starting temporary container for rolling update (if image present)..."
+        - docker run -d --name traefik-dynamic-backend-temp "$IMAGE" || (echo "Failed to run temp container, trying compose up with pull..." && docker compose -f docker-compose-deploy.yml pull && docker run -d --name traefik-dynamic-backend-temp "$IMAGE")
 
-        - echo "Waiting 5s for temporary container..."
+        - echo "Waiting for temporary container to become healthy (adjust timeout as needed)..."
         - sleep 5
 
-        - echo "Removing old container..."
+        - echo "Removing old container (if exists)..."
         - docker rm -f traefik-dynamic-backend2 || true  
 
-        - echo "Starting main container from compose..."
+        - echo "Recreating stack using compose..."
         - docker compose -f docker-compose-deploy.yml up -d --force-recreate
 
         - echo "Cleaning temporary container..."
