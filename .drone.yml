@@ -2,39 +2,23 @@ platform:
   os: linux
   arch: arm64
 
+
 kind: pipeline
 type: docker
 name: build
 
 steps:
-  # Pre-pull cached images from registry (optional, for first run)
-  - name: pull-cache
-    image: docker:cli
-    volumes:
-      - name: dockersock
-        path: /var/run/docker.sock
-    commands:
-      - docker pull ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest || true
-      - docker pull ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild || true
-
-  # Build with host Docker daemon (has access to cached base images)
   - name: build-image
     image: docker:cli
-    volumes:
-      - name: dockersock
-        path: /var/run/docker.sock
     environment:
       DOCKER_BUILDKIT: 1
     commands:
-      # Build WITHOUT --pull to use local cache
       - |
         docker build \
           --file dockerfilefast \
           --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest \
           --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:${DRONE_COMMIT_SHA} \
           --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild \
-          --cache-from ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest \
-          --cache-from ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild \
           --build-arg BUILDKIT_INLINE_CACHE=1 \
           --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
           --label org.opencontainers.image.revision=${DRONE_COMMIT_SHA} \
@@ -42,12 +26,8 @@ steps:
           --label org.opencontainers.image.url=${DRONE_REPO_LINK} \
           .
 
-  # Push to registry
   - name: push-image
     image: docker:cli
-    volumes:
-      - name: dockersock
-        path: /var/run/docker.sock
     environment:
       GHCR_USERNAME:
         from_secret: ghcr_username
@@ -60,8 +40,6 @@ steps:
       - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
       - docker logout ghcr.io
 
-  
-  # Deploy
   - name: redeploy-stack
     image: appleboy/drone-ssh
     settings:
@@ -92,8 +70,3 @@ steps:
 
         - echo "Cleaning temporary container..."
         - docker rm -f traefik-dynamic-backend-temp || true
-
-volumes:
-  - name: dockersock
-    host:
-      path: /var/run/docker.sock
