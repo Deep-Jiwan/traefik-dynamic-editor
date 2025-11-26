@@ -7,31 +7,61 @@ type: docker
 name: build
 
 steps:
-  - name: build-docker-image
-    image: plugins/docker:linux-arm64
-    settings:
-      repo: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor
-      tags:
-        - latest
-        - ${DRONE_COMMIT_SHA}
-        - autobuild
-      dockerfile: dockerfilefast
-      registry: ghcr.io
-      platforms:
-        - linux/arm64
-      username:
+  # Pre-pull cached images from registry (optional, for first run)
+  - name: pull-cache
+    image: docker:cli
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker pull ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest || true
+      - docker pull ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild || true
+
+  # Build with host Docker daemon (has access to cached base images)
+  - name: build-image
+    image: docker:cli
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    environment:
+      DOCKER_BUILDKIT: 1
+    commands:
+      # Build WITHOUT --pull to use local cache
+      - |
+        docker build \
+          --file dockerfilefast \
+          --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest \
+          --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:${DRONE_COMMIT_SHA} \
+          --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild \
+          --cache-from ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest \
+          --cache-from ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --label org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+          --label org.opencontainers.image.revision=${DRONE_COMMIT_SHA} \
+          --label org.opencontainers.image.source=${DRONE_REPO_LINK} \
+          --label org.opencontainers.image.url=${DRONE_REPO_LINK} \
+          .
+
+  # Push to registry
+  - name: push-image
+    image: docker:cli
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    environment:
+      GHCR_USERNAME:
         from_secret: ghcr_username
-      password:
+      GHCR_TOKEN:
         from_secret: ghcr_token
+    commands:
+      - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest
+      - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:${DRONE_COMMIT_SHA}
+      - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
+      - docker logout ghcr.io
 
-      # Enable Docker layer caching
-      buildkit: true
-      cache_from:
-        - ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest
-        - ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
-      cache_to:
-        - type=inline
-
+  
+  # Deploy
   - name: redeploy-stack
     image: appleboy/drone-ssh
     settings:
@@ -48,24 +78,22 @@ steps:
         - echo "Pulling latest image..."
         - docker compose -f docker-compose-deploy.yml pull
 
-        # 1. Start a temporary container for rolling update
         - echo "Starting temporary container..."
         - docker run -d --name traefik-dynamic-backend-temp ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
 
-        # 2. Wait for new container to be healthy (adjust if you need)
         - echo "Waiting 5s for temporary container..."
         - sleep 5
 
-        # 3. Remove the old main container
         - echo "Removing old container..."
         - docker rm -f traefik-dynamic-backend2 || true  
 
-        # 4. Recreate your main container cleanly using compose
         - echo "Starting main container from compose..."
         - docker compose -f docker-compose-deploy.yml up -d --force-recreate
 
-        # 5. Remove the temporary container
         - echo "Cleaning temporary container..."
         - docker rm -f traefik-dynamic-backend-temp || true
 
-
+volumes:
+  - name: dockersock
+    host:
+      path: /var/run/docker.sock
