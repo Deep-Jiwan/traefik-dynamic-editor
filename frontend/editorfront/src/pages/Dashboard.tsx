@@ -21,10 +21,12 @@ export const Dashboard = () => {
   const [isRouterModalOpen, setIsRouterModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isYAMLEditorOpen, setIsYAMLEditorOpen] = useState(false)
+  const [isComponentsEditorOpen, setIsComponentsEditorOpen] = useState(false)
   const [editingRouter, setEditingRouter] = useState<string | null>(null)
   const [deletingRouter, setDeletingRouter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [statusTrigger, setStatusTrigger] = useState(0)
 
   const apiBase = getApiBase()
 
@@ -49,6 +51,7 @@ export const Dashboard = () => {
         if (message.type === 'config-updated') {
           mutateRouters()
           mutateEntryPoints()
+          setStatusTrigger(prev => prev + 1)
           showToast('Configuration updated', 'info')
         }
       },
@@ -76,6 +79,7 @@ export const Dashboard = () => {
     setEditingRouter(null)
     mutateRouters()
     mutateEntryPoints()
+    setStatusTrigger(prev => prev + 1)
     showToast('Router saved successfully', 'success')
   }
 
@@ -93,6 +97,7 @@ export const Dashboard = () => {
       setDeletingRouter(null)
       mutateRouters()
       mutateEntryPoints()
+      setStatusTrigger(prev => prev + 1)
       showToast('Router deleted successfully', 'success')
     } catch (error) {
       console.error('Error deleting router:', error)
@@ -106,8 +111,7 @@ export const Dashboard = () => {
 
   const handleRefreshStatus = () => {
     setIsRefreshing(true)
-    // Force refresh by triggering a re-render with a key change
-    mutateRouters()
+    setStatusTrigger(prev => prev + 1)
     setTimeout(() => {
       setIsRefreshing(false)
       showToast('Service status refreshed', 'info')
@@ -185,14 +189,24 @@ export const Dashboard = () => {
             <>
               {/* Search Bar & Actions */}
               <div className="mb-4 flex justify-between gap-3">
-                <button
-                  onClick={() => setIsYAMLEditorOpen(true)}
-                  className="px-4 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white hover:bg-[hsla(206,100%,50%,0.04)] transition-colors flex items-center gap-2"
-                  title="Edit YAML configuration"
-                >
-                  <FiEdit className="w-4 h-4" />
-                  Edit
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsYAMLEditorOpen(true)}
+                    className="px-3 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white hover:bg-[hsla(206,100%,50%,0.04)] transition-colors flex items-center gap-2"
+                    title="Edit dynamic configuration"
+                  >
+                    <FiEdit className="w-4 h-4" />
+                    Edit Dynamic
+                  </button>
+                  <button
+                    onClick={() => setIsComponentsEditorOpen(true)}
+                    className="px-3 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white hover:bg-[hsla(206,100%,50%,0.04)] transition-colors flex items-center gap-2"
+                    title="Edit components configuration"
+                  >
+                    <FiEdit className="w-4 h-4" />
+                    Edit Components
+                  </button>
+                </div>
                 <div className="flex gap-3">
                   <button
                     onClick={handleRefreshStatus}
@@ -209,7 +223,7 @@ export const Dashboard = () => {
                     placeholder="Search routers..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white placeholder-[hsla(0,0%,100%,0.51)] focus:ring-2 focus:ring-[#2aa2c1] focus:border-transparent"
+                    className="w-full pl-10 pr-10 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white placeholder-[hsla(0,0%,100%,0.51)] focus:ring-1 focus:ring-[#2aa2c1] focus:border-transparent"
                   />
                   {searchQuery && (
                     <button
@@ -232,6 +246,7 @@ export const Dashboard = () => {
                       router={router}
                       onEdit={handleEditRouter}
                       onDelete={handleDeleteRouter}
+                      statusTrigger={statusTrigger}
                     />
                   ))}
                 </RoutersTable>
@@ -240,7 +255,7 @@ export const Dashboard = () => {
                   <table className="w-full min-w-max">
                     <thead className="bg-[#1e2b39] border-b border-[#2f3d4d]">
                       <tr>
-                        <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[150px]">
+                        <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[100px]">
                           Router Name
                         </th>
                         <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[180px]">
@@ -304,6 +319,7 @@ export const Dashboard = () => {
           setEditingRouter(null)
         }}
         title={editingRouter ? 'Edit Router' : 'Add Router'}
+        description="Add a new router to route a domain name to a service"
       >
         <RouterForm
           routerName={editingRouter}
@@ -358,8 +374,24 @@ export const Dashboard = () => {
         onSave={() => {
           mutateRouters()
           mutateEntryPoints()
+          setStatusTrigger(prev => prev + 1)
           showToast('Configuration saved successfully', 'success')
         }}
+        title="Edit Dynamic Configuration"
+        description="Edit the dynamic.yml file from Traefik. This may break this app if not edited correctly."
+        endpoint="yaml"
+      />
+
+      {/* Components Editor Modal */}
+      <YAMLEditor
+        isOpen={isComponentsEditorOpen}
+        onClose={() => setIsComponentsEditorOpen(false)}
+        onSave={() => {
+          showToast('Components configuration saved successfully', 'success')
+        }}
+        title="Edit Components Configuration"
+        description="Edit this app components. Add auto-discovered components from Traefik here. This file does not affect operation of Traefik. Just because a service is defined here does not mean it is available in Traefik."
+        endpoint="components"
       />
     </>
   )

@@ -18,7 +18,7 @@ export const Button = ({
   disabled = false,
 }: ButtonProps) => {
   const baseClass =
-    'px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
+    'px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
 
   const variantClasses = {
     primary: 'bg-[#2aa2c1] hover:bg-[#238a9f] text-white focus:ring-[#2aa2c1]',

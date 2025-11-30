@@ -4,6 +4,7 @@ export interface Router {
   rule: string
   entryPoints: string[]
   service: string
+  middlewares?: string[]
   tls: TLS | null
 }
 
@@ -46,6 +47,12 @@ export interface WebSocketMessage {
   data?: unknown
 }
 
+export interface Middleware {
+  name: string
+  type: string
+  description: string
+}
+
 export interface RouterFormData {
   name: string
   host: string
@@ -53,4 +60,6 @@ export interface RouterFormData {
   serviceUrl: string
   entryPoints: string[]
   tlsEnabled: boolean
+  authEnabled: boolean
+  authMiddleware: string
 }

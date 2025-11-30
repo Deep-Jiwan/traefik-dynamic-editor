@@ -1,6 +1,9 @@
 import { useState, FormEvent, useEffect } from 'react'
+import useSWR from 'swr'
+import { FiChevronDown } from 'react-icons/fi'
 import { Button } from './Button'
-import type { RouterFormData, Router, Config } from '../types/traefik'
+import { Checkbox } from './Checkbox'
+import type { RouterFormData, Router, Config, Middleware } from '../types/traefik'
 import { getApiBase } from '../utils/config'
 
 interface RouterFormProps {
@@ -17,10 +20,36 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
     serviceUrl: '',
     entryPoints: ['websecure'],
     tlsEnabled: true,
+    authEnabled: false,
+    authMiddleware: '',
   })
-  const [customEntryPoints, setCustomEntryPoints] = useState<string[]>([])
-  const [newEntryPoint, setNewEntryPoint] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const apiBase = getApiBase()
+  
+  // Fetch available middlewares
+  const { data: middlewares } = useSWR<Middleware[]>(`${apiBase}/middlewares`)
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape to cancel
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+      // Ctrl+S or Cmd+S to save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        const form = document.querySelector('form')
+        if (form) {
+          form.requestSubmit()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
 
   useEffect(() => {
     if (routerName) {
@@ -41,6 +70,9 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
       const service = config.http.services[router.service]
       const serviceUrl = service?.loadBalancer.servers[0]?.url || ''
 
+      const hasAuth = !!(router.middlewares && router.middlewares.length > 0)
+      const authMiddleware = hasAuth && router.middlewares ? router.middlewares[0] : ''
+
       setFormData({
         name,
         host,
@@ -48,12 +80,9 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
         serviceUrl,
         entryPoints: router.entryPoints,
         tlsEnabled: router.tls !== null,
+        authEnabled: hasAuth,
+        authMiddleware: authMiddleware,
       })
-
-      // Find custom entry points
-      const standard = ['web', 'websecure']
-      const custom = router.entryPoints.filter((ep) => !standard.includes(ep))
-      setCustomEntryPoints(custom)
     } catch (error) {
       console.error('Error loading router:', error)
     }
@@ -71,6 +100,9 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
         rule: `Host(\`${formData.host}\`)`,
         entryPoints: formData.entryPoints,
         service: formData.serviceName,
+        middlewares: formData.authEnabled && formData.authMiddleware 
+          ? [formData.authMiddleware] 
+          : undefined,
         tls: formData.tlsEnabled ? { certResolver: 'cloudflare' } : null,
       }
 
@@ -118,156 +150,143 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
     }))
   }
 
-  const addCustomEntryPoint = () => {
-    const ep = newEntryPoint.trim()
-    if (!ep) return
-    if (formData.entryPoints.includes(ep)) {
-      alert('Entry point already exists')
-      return
+  const handleHostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Check for invalid protocol prefixes
+    if (/^(https?:\/\/|wss?:\/\/)/i.test(value)) {
+      e.target.setCustomValidity('Host should not include http://, https://, ws://, or wss://')
+    } else {
+      e.target.setCustomValidity('')
     }
-
-    setCustomEntryPoints((prev) => [...prev, ep])
-    setFormData((prev) => ({
-      ...prev,
-      entryPoints: [...prev.entryPoints, ep],
-    }))
-    setNewEntryPoint('')
-  }
-
-  const removeCustomEntryPoint = (ep: string) => {
-    setCustomEntryPoints((prev) => prev.filter((e) => e !== ep))
-    setFormData((prev) => ({
-      ...prev,
-      entryPoints: prev.entryPoints.filter((e) => e !== ep),
-    }))
+    setFormData((prev) => ({ ...prev, host: value }))
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-3">
       <div>
-        <label className="block text-sm font-medium text-white mb-2">Router Name</label>
+        <label className="block text-xs font-medium text-white mb-1">Router Name</label>
         <input
           type="text"
           value={formData.name}
           onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
           disabled={!!routerName}
-          className="w-full px-4 py-2 bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-2 focus:ring-[#2aa2c1] focus:border-transparent text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-3 py-2 text-sm bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-1 focus:ring-[#2aa2c1] focus:border-transparent text-white disabled:opacity-50 disabled:cursor-not-allowed"
           placeholder="my-service-router"
           required
         />
-        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-1">Unique identifier for this router</p>
+        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-0.5">Unique identifier for this router</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-white mb-2">Host Rule</label>
+        <label className="block text-xs font-medium text-white mb-1">Host Rule</label>
         <input
           type="text"
           value={formData.host}
-          onChange={(e) => setFormData((prev) => ({ ...prev, host: e.target.value }))}
-          className="w-full px-4 py-2 bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-2 focus:ring-[#2aa2c1] focus:border-transparent text-white"
+          onChange={handleHostChange}
+          pattern="^(?!https?:\/\/)(?!wss?:\/\/).*$"
+          className="w-full px-3 py-2 text-sm bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-1 focus:ring-[#2aa2c1] focus:border-transparent text-white"
           placeholder="example.com"
+          title="Host should not include http://, https://, ws://, or wss://"
           required
         />
-        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-1">Domain name for this service</p>
+        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-0.5">Domain name for this service (without protocol)</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-white mb-2">Service Name</label>
+        <label className="block text-xs font-medium text-white mb-1">Service Name</label>
         <input
           type="text"
           value={formData.serviceName}
           onChange={(e) => setFormData((prev) => ({ ...prev, serviceName: e.target.value }))}
-          className="w-full px-4 py-2 bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-2 focus:ring-[#2aa2c1] focus:border-transparent text-white"
+          className="w-full px-3 py-2 text-sm bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-1 focus:ring-[#2aa2c1] focus:border-transparent text-white"
           placeholder="my-service"
           required
         />
-        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-1">Name of the service to route to</p>
+        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-0.5">Name of the service to route to</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-white mb-2">Backend URL</label>
+        <label className="block text-xs font-medium text-white mb-1">Backend URL</label>
         <input
           type="url"
           value={formData.serviceUrl}
           onChange={(e) => setFormData((prev) => ({ ...prev, serviceUrl: e.target.value }))}
-          className="w-full px-4 py-2 bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-2 focus:ring-[#2aa2c1] focus:border-transparent text-white"
+          className="w-full px-3 py-2 text-sm bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-1 focus:ring-[#2aa2c1] focus:border-transparent text-white"
           placeholder="http://192.168.1.100:8080"
           required
         />
-        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-1">Internal service URL (http://ip:port)</p>
+        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-0.5">Internal service URL (http://ip:port)</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-white mb-2">Entry Points</label>
+        <label className="block text-xs font-medium text-white mb-1">Entry Points</label>
+        <div className="flex gap-6">
+          <Checkbox
+            checked={formData.entryPoints.includes('web')}
+            onChange={() => toggleEntryPoint('web')}
+            label="HTTP (web)"
+          />
+          <Checkbox
+            checked={formData.entryPoints.includes('websecure')}
+            onChange={() => toggleEntryPoint('websecure')}
+            label="HTTPS (websecure)"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-white mb-1.5">TLS & Authentication</label>
         <div className="space-y-2">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={formData.entryPoints.includes('web')}
-              onChange={() => toggleEntryPoint('web')}
-              className="w-4 h-4 text-[#2aa2c1] border-[#2f3d4d] rounded focus:ring-[#2aa2c1]"
-            />
-            <span className="ml-2 text-sm text-white">HTTP (web)</span>
-          </label>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={formData.entryPoints.includes('websecure')}
-              onChange={() => toggleEntryPoint('websecure')}
-              className="w-4 h-4 text-[#2aa2c1] border-[#2f3d4d] rounded focus:ring-[#2aa2c1]"
-            />
-            <span className="ml-2 text-sm text-white">HTTPS (websecure)</span>
-          </label>
-          {customEntryPoints.map((ep) => (
-            <label key={ep} className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.entryPoints.includes(ep)}
-                  onChange={() => toggleEntryPoint(ep)}
-                  className="w-4 h-4 text-[#2aa2c1] border-[#2f3d4d] rounded focus:ring-[#2aa2c1]"
-                />
-                <span className="ml-2 text-sm text-white">{ep}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => removeCustomEntryPoint(ep)}
-                className="text-red-600 hover:text-red-800 text-xs"
-              >
-                Remove
-              </button>
-            </label>
-          ))}
-        </div>
-        <div className="mt-3 flex gap-2">
-          <input
-            type="text"
-            value={newEntryPoint}
-            onChange={(e) => setNewEntryPoint(e.target.value)}
-            className="flex-1 px-3 py-2 text-sm bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-2 focus:ring-[#2aa2c1] focus:border-transparent text-white"
-            placeholder="custom-port"
-          />
-          <Button type="button" variant="secondary" onClick={addCustomEntryPoint}>
-            + Add Custom
-          </Button>
-        </div>
-      </div>
-
-      <div>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={formData.tlsEnabled}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, tlsEnabled: e.target.checked }))
-            }
-            className="w-4 h-4 text-[#2aa2c1] border-[#2f3d4d] rounded focus:ring-[#2aa2c1]"
+            onChange={(checked) => setFormData((prev) => ({ ...prev, tlsEnabled: checked }))}
+            label="Enable TLS"
           />
-          <span className="ml-2 text-sm font-medium text-white">Enable TLS</span>
-        </label>
+          
+          <Checkbox
+            checked={formData.authEnabled}
+            onChange={(checked) =>
+              setFormData((prev) => ({ 
+                ...prev, 
+                authEnabled: checked,
+                authMiddleware: checked ? (middlewares?.filter(m => m.type === 'auth')[0]?.name || '') : ''
+              }))
+            }
+            label="Enable Authentication"
+          />
+        </div>
       </div>
 
-      <div className="flex gap-3 pt-4">
+      {formData.authEnabled && (
+        <div>
+          <div className="relative">
+            <select
+              value={formData.authMiddleware}
+              onChange={(e) => setFormData((prev) => ({ ...prev, authMiddleware: e.target.value }))}
+              className="w-full px-3 py-2 text-sm bg-[#0d1b2a] border-2 border-[#2f3d4d] rounded-lg focus:ring-1 focus:ring-[#2aa2c1] focus:border-[#2aa2c1] text-white appearance-none cursor-pointer hover:border-[#2aa2c1]/50 transition-colors pr-10"
+              required={formData.authEnabled}
+              style={{
+                backgroundImage: 'none',
+              }}
+            >
+              <option value="" className="bg-[#1e2b39] text-white">Select middleware...</option>
+              {middlewares?.filter(m => m.type === 'auth').map((middleware) => (
+                <option key={middleware.name} value={middleware.name} className="bg-[#1e2b39] text-white">
+                  {middleware.name}
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+              <FiChevronDown className="w-4 h-4 text-[hsla(0,0%,100%,0.51)]" />
+            </div>
+          </div>
+          <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-0.5">
+            Choose your authentication middleware. Create one using Edit Components
+          </p>
+        </div>
+      )}
+
+      <div className="flex gap-3 pt-3">
         <Button type="submit" variant="primary" className="flex-1" disabled={loading}>
           {loading ? 'Saving...' : 'Save Router'}
         </Button>

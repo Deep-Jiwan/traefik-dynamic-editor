@@ -1,47 +1,84 @@
-import { FiEdit, FiTrash2, FiExternalLink } from 'react-icons/fi'
+import { FiEdit, FiTrash2, FiExternalLink, FiLock, FiCopy } from 'react-icons/fi'
 import type { Router } from '../types/traefik'
 import { StatusBadge } from './StatusBadge'
 import { useServiceStatus } from '../hooks/useServiceStatus'
+import { useToast } from '../contexts/ToastContext'
+import useSWR from 'swr'
+import { getApiBase } from '../utils/config'
+import type { Config } from '../types/traefik'
 
 interface RouterRowProps {
   name: string
   router: Router
   onEdit: (name: string) => void
   onDelete: (name: string) => void
+  statusTrigger?: number
 }
 
-export const RouterRow = ({ name, router, onEdit, onDelete }: RouterRowProps) => {
+export const RouterRow = ({ name, router, onEdit, onDelete, statusTrigger = 0 }: RouterRowProps) => {
+  const { showToast } = useToast()
+  const apiBase = getApiBase()
+  const { data: config } = useSWR<Config>(`${apiBase}/config`)
+  
   const host = router.rule.match(/Host\(`([^`]+)`\)/)?.[1] || 'Unknown'
   const hasTLS = router.tls !== null && router.tls !== undefined
+  const hasAuth = router.middlewares && router.middlewares.length > 0
   const scheme = hasTLS ? 'https' : 'http'
+  const fullUrl = host !== 'Unknown' ? `${scheme}://${host}` : ''
+  const backendUrl = config?.http.services[router.service]?.loadBalancer.servers[0]?.url || ''
 
-  const serviceStatus = useServiceStatus(host !== 'Unknown' ? host : null, scheme)
+  const serviceStatus = useServiceStatus(host !== 'Unknown' ? host : null, scheme, statusTrigger)
+
+  const copyToClipboard = (text: string, message: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(message, 'info')
+    }).catch((err) => {
+      console.error('Failed to copy:', err)
+      showToast('Failed to copy to clipboard', 'error')
+    })
+  }
 
   return (
     <tr className="hover:bg-[hsla(206,100%,50%,0.04)] transition-colors">
-      <td className="px-6 py-5" style={{ width: '25%' }}>
+      <td className="px-6 py-5" style={{ width: '15%' }}>
         <div className="text-sm font-medium text-[hsla(0,0%,100%,0.74)] truncate" title={name}>{name}</div>
       </td>
-      <td className="px-6 py-5" style={{ width: '24%' }}>
+      <td className="px-6 py-5" style={{ width: '22%' }}>
         {host !== 'Unknown' ? (
-          <a
-            href={`${scheme}://${host}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center text-sm text-[hsla(0,0%,100%,0.74)] hover:text-[#2aa2c1] no-underline transition-colors max-w-full"
-            title={`Open ${host}`}
-          >
-            <span className="truncate">{host}</span>
-            <FiExternalLink className="ml-2 text-[#2aa2c1] flex-shrink-0" size={14} />
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href={fullUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center text-sm text-[hsla(0,0%,100%,0.74)] hover:text-[#2aa2c1] no-underline transition-colors"
+              title={`Open ${host}`}
+            >
+              <span className="truncate">{host}</span>
+              <FiExternalLink className="ml-1 text-[#2aa2c1] flex-shrink-0" size={14} />
+            </a>
+            <button
+              onClick={() => copyToClipboard(fullUrl, 'Copied to clipboard!')}
+              className="text-[hsla(0,0%,100%,0.51)] hover:text-[#2aa2c1] transition-colors flex-shrink-0"
+              title="Copy URL"
+            >
+              <FiCopy size={14} />
+            </button>
+          </div>
         ) : (
           <div className="text-sm text-[hsla(0,0%,100%,0.74)] truncate" title={host}>{host}</div>
         )}
       </td>
-      <td className="px-6 py-5" style={{ width: '12%' }}>
-        <div className="text-sm text-[hsla(0,0%,100%,0.74)] truncate" title={router.service}>{router.service}</div>
+      <td className="px-6 py-5" style={{ width: '11%' }}>
+        <button
+          onClick={() => copyToClipboard(backendUrl, 'Backend URL Copied!')}
+          className="text-sm text-[hsla(0,0%,100%,0.74)] hover:text-[#2aa2c1] transition-colors truncate cursor-pointer text-left"
+          title={backendUrl || router.service}
+          disabled={!backendUrl}
+        >
+          {router.service}
+        </button>
       </td>
-      <td className="px-6 py-5" style={{ width: '15%' }}>
+      <td className="px-6 py-5" style={{ width: '13%' }}>
         <div className="flex flex-wrap gap-1">
           {router.entryPoints.map((ep) => (
             <span
@@ -58,7 +95,7 @@ export const RouterRow = ({ name, router, onEdit, onDelete }: RouterRowProps) =>
           ))}
         </div>
       </td>
-      <td className="px-6 py-5" style={{ width: '8%' }}>
+      <td className="px-6 py-5" style={{ width: '7%' }}>
         {hasTLS && (
           <div title="TLS Enabled">
             <svg
@@ -73,7 +110,14 @@ export const RouterRow = ({ name, router, onEdit, onDelete }: RouterRowProps) =>
           </div>
         )}
       </td>
-      <td className="px-6 py-5 text-sm font-medium" style={{ width: '14%' }}>
+      <td className="px-6 py-5" style={{ width: '7%' }}>
+        {hasAuth && (
+          <div title="Authentication Enabled" className="flex justify-center">
+            <FiLock className="w-5 h-5" style={{ color: '#2aa2c1' }} />
+          </div>
+        )}
+      </td>
+      <td className="px-6 py-5 text-sm font-medium" style={{ width: '13%' }}>
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => onEdit(name)}

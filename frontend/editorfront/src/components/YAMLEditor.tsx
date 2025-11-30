@@ -12,15 +12,38 @@ interface YAMLEditorProps {
   isOpen: boolean
   onClose: () => void
   onSave: () => void
+  title?: string
+  description?: string
+  endpoint?: string
 }
 
-export const YAMLEditor = ({ isOpen, onClose, onSave }: YAMLEditorProps) => {
+export const YAMLEditor = ({ isOpen, onClose, onSave, title = 'Edit Configuration', description, endpoint = 'yaml' }: YAMLEditorProps) => {
   const editorRef = useRef<HTMLDivElement>(null)
   const editorViewRef = useRef<EditorView | null>(null)
   const [yaml_content, setYamlContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape to close
+      if (e.key === 'Escape') {
+        handleClose()
+      }
+      // Ctrl+S or Cmd+S to save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        handleSave()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen])
 
   // Fetch YAML content when modal opens
   useEffect(() => {
@@ -47,7 +70,7 @@ export const YAMLEditor = ({ isOpen, onClose, onSave }: YAMLEditorProps) => {
     setError('')
     try {
       const apiBase = getApiBase()
-      const response = await fetch(`${apiBase}/yaml`)
+      const response = await fetch(`${apiBase}/${endpoint}`)
       if (!response.ok) throw new Error('Failed to fetch YAML content')
       const text = await response.text()
       setYamlContent(text)
@@ -92,7 +115,7 @@ export const YAMLEditor = ({ isOpen, onClose, onSave }: YAMLEditorProps) => {
       
       // Parse YAML and validate it's valid JSON structure
       const apiBase = getApiBase()
-      const response = await fetch(`${apiBase}/yaml`, {
+      const response = await fetch(`${apiBase}/${endpoint}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'text/yaml' },
         body: content,
@@ -150,10 +173,15 @@ export const YAMLEditor = ({ isOpen, onClose, onSave }: YAMLEditorProps) => {
       <div className="relative bg-[#1e2b39] rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-[#2f3d4d]">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[#2f3d4d]">
-          <h2 className="text-2xl font-bold text-white">Edit Dynamic Configuration</h2>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-white">{title}</h2>
+            {description && (
+              <p className="text-sm text-[hsla(0,0%,100%,0.51)] mt-1">{description}</p>
+            )}
+          </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-white transition"
+            className="text-gray-400 hover:text-white transition ml-4"
             title="Close (or click outside)"
           >
             <FiX size={24} />

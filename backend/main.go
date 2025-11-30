@@ -19,9 +19,10 @@ import (
 
 // Config holds the dynamic configuration path
 var (
-	configPath        = getEnv("DYNAMIC_CONFIG_PATH", "../dynamic/dynamic.yml")
-	traefikConfigPath = getEnv("TRAEFIK_CONFIG_PATH", "../config/traefik.yml")
-	upgrader          = websocket.Upgrader{
+	configPath           = getEnv("DYNAMIC_CONFIG_PATH", "../dynamic/dynamic.yml")
+	traefikConfigPath    = getEnv("TRAEFIK_CONFIG_PATH", "../config/traefik.yml")
+	componentsConfigPath = getEnv("COMPONENTS_CONFIG_PATH", "./traefik-components.yml")
+	upgrader             = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Allow all origins for development
 		},
@@ -54,6 +55,7 @@ type Router struct {
 	Rule        string   `yaml:"rule" json:"rule"`
 	EntryPoints []string `yaml:"entryPoints" json:"entryPoints"`
 	Service     string   `yaml:"service" json:"service"`
+	Middlewares []string `yaml:"middlewares,omitempty" json:"middlewares,omitempty"`
 	TLS         *TLS     `yaml:"tls,omitempty" json:"tls,omitempty"`
 }
 
@@ -73,11 +75,27 @@ type Server struct {
 	URL string `yaml:"url" json:"url"`
 }
 
+type Middleware struct {
+	Name        string `yaml:"name" json:"name"`
+	Type        string `yaml:"type" json:"type"`
+	Description string `yaml:"description" json:"description"`
+}
+
+type ComponentsConfig struct {
+	Middlewares []Middleware `yaml:"middlewares" json:"middlewares"`
+}
+
 func main() {
 	// Log configuration paths on startup
 	log.Printf("Starting Traefik Dynamic Config Editor")
 	log.Printf("Dynamic config path: %s", configPath)
 	log.Printf("Traefik config path: %s", traefikConfigPath)
+	log.Printf("Components config path: %s", componentsConfigPath)
+
+	// Ensure components config file exists
+	if err := ensureComponentsConfig(); err != nil {
+		log.Printf("Warning: Could not ensure components config: %v", err)
+	}
 
 	// Initialize file watcher
 	var err error
@@ -105,6 +123,9 @@ func main() {
 	api.HandleFunc("/routers/{name}", getRouter).Methods("GET")
 	api.HandleFunc("/routers/{name}", createOrUpdateRouter).Methods("POST", "PUT")
 	api.HandleFunc("/routers/{name}", deleteRouter).Methods("DELETE")
+	api.HandleFunc("/middlewares", getMiddlewares).Methods("GET")
+	api.HandleFunc("/components", getComponentsYAML).Methods("GET")
+	api.HandleFunc("/components", updateComponentsYAML).Methods("PUT")
 	api.HandleFunc("/ws", handleWebSocket)
 
 	// Enable CORS
@@ -208,6 +229,46 @@ func updateYAML(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "YAML configuration updated"})
 }
 
+// GET /api/components - Get raw components YAML configuration
+func getComponentsYAML(w http.ResponseWriter, r *http.Request) {
+	data, err := os.ReadFile(componentsConfigPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/yaml")
+	w.Header().Set("Content-Disposition", "inline")
+	w.Write(data)
+}
+
+// PUT /api/components - Update raw components YAML configuration
+func updateComponentsYAML(w http.ResponseWriter, r *http.Request) {
+	// Read raw YAML body
+	yamlData, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Validate YAML by unmarshaling it
+	var config ComponentsConfig
+	if err := yaml.Unmarshal(yamlData, &config); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid YAML: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Write the YAML file directly
+	if err := os.WriteFile(componentsConfigPath, yamlData, 0644); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to write config: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Components configuration updated"})
+}
+
 // GET /api/routers - List all routers
 func listRouters(w http.ResponseWriter, r *http.Request) {
 	config, err := readConfig()
@@ -298,12 +359,31 @@ func deleteRouter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, exists := config.HTTP.Routers[name]; !exists {
+	router, exists := config.HTTP.Routers[name]
+	if !exists {
 		http.Error(w, "Router not found", http.StatusNotFound)
 		return
 	}
 
+	// Store the service name before deleting the router
+	serviceName := router.Service
+
+	// Delete the router
 	delete(config.HTTP.Routers, name)
+
+	// Check if any other router is using this service
+	serviceInUse := false
+	for _, r := range config.HTTP.Routers {
+		if r.Service == serviceName {
+			serviceInUse = true
+			break
+		}
+	}
+
+	// Delete the service only if no other router is using it
+	if !serviceInUse {
+		delete(config.HTTP.Services, serviceName)
+	}
 
 	if err := writeConfig(config); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -479,6 +559,44 @@ func readTraefikConfig() (*TraefikStaticConfig, error) {
 	return &config, nil
 }
 
+// GET /api/middlewares - Get available middlewares from components config
+func getMiddlewares(w http.ResponseWriter, r *http.Request) {
+	components, err := readComponentsConfig()
+	if err != nil {
+		log.Printf("Error reading components config: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to read components config: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(components.Middlewares)
+}
+
+// Read components configuration
+func readComponentsConfig() (*ComponentsConfig, error) {
+	data, err := os.ReadFile(componentsConfigPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("Components config file not found at %s, returning empty config", componentsConfigPath)
+			return &ComponentsConfig{
+				Middlewares: []Middleware{},
+			}, nil
+		}
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var config ComponentsConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	if config.Middlewares == nil {
+		config.Middlewares = []Middleware{}
+	}
+
+	return &config, nil
+}
+
 // GET /api/ping?host=example.com - simple reachability check (uses https://<host>)
 func pingHandler(w http.ResponseWriter, r *http.Request) {
 	host := r.URL.Query().Get("host")
@@ -540,6 +658,39 @@ func writeConfig(config *TraefikConfig) error {
 	}
 
 	return os.WriteFile(configPath, data, 0644)
+}
+
+// Ensure components config file exists with default structure
+func ensureComponentsConfig() error {
+	// Check if file exists
+	if _, err := os.Stat(componentsConfigPath); os.IsNotExist(err) {
+		log.Printf("Components config not found, creating default file at: %s", componentsConfigPath)
+		
+		// Create directory if it doesn't exist
+		dir := filepath.Dir(componentsConfigPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory: %v", err)
+		}
+
+		// Create default components config with example
+		defaultYAML := `middlewares:
+  - name: name-of-your-middleware
+    type: what-type-is-this-auth-blocking-etc
+    description: describe your middleware here
+`
+
+		if err := os.WriteFile(componentsConfigPath, []byte(defaultYAML), 0644); err != nil {
+			return fmt.Errorf("failed to write default config: %v", err)
+		}
+
+		log.Printf("Created default components config file")
+	} else if err != nil {
+		return fmt.Errorf("error checking file: %v", err)
+	} else {
+		log.Printf("Components config file found at: %s", componentsConfigPath)
+	}
+
+	return nil
 }
 
 // Get environment variable with default

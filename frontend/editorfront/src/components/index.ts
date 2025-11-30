@@ -1,4 +1,5 @@
 export { Button } from './Button'
+export { Checkbox } from './Checkbox'
 export { ConnectionStatus } from './ConnectionStatus'
 export { EmptyState } from './EmptyState'
 export { EntryPointsList } from './EntryPointsList'
