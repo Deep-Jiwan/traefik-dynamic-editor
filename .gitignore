@@ -37,6 +37,9 @@ Thumbs.db
 .env
 .env.local
 
+/dynamic
+/config
+
 
 dynamic.yml
 traefik.yml
@@ -49,3 +52,5 @@ deploy.sh
 temp
 node_modules
 run-app.ps1
+theme.md
+other/

@@ -12,11 +12,8 @@ export const getWebSocketUrl = (): string => {
   }
 
   try {
-    const apiBase = getApiBase()
-    const apiUrl = new URL(apiBase, window.location.href)
-    const wsProtocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsPath = apiUrl.pathname.replace(/\/api\/?$/, '/api/ws')
-    return `${wsProtocol}//${apiUrl.host}${wsPath}`
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${wsProtocol}//${window.location.host}/api/ws`
   } catch {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     return `${proto}//${window.location.host}/api/ws`

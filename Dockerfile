@@ -1,64 +1,53 @@
-# Multi-stage Dockerfile for Traefik Dynamic Config Editor
+# dockerfilefast
+# Fast-build Dockerfile for Traefik Dynamic Config Editor (dev/local use)
+# NOTE: using --platform to ensure BuildKit resolves the correct platform (avoid unnecessary pulls)
+# and using BUILDKIT_INLINE_CACHE to allow inline cache export/import.
 
-# Stage 1: Build React frontend
-FROM node:20-alpine AS frontend-builder
+ARG BUILDKIT_INLINE_CACHE=1
 
+# Stage 1: Build React frontend (dev-optimized)
+FROM --platform=linux/arm64 node:20-alpine AS frontend-dev
 WORKDIR /src/frontend/editorfront
 
-# Copy frontend package files
+# Install dependencies only if package files change
 COPY frontend/editorfront/package.json frontend/editorfront/package-lock.json ./
+RUN npm ci --legacy-peer-deps
 
-# Install dependencies
-RUN npm ci
+# Copy all files except node_modules for robust dev build
+COPY frontend/editorfront/. ./
 
-# Copy frontend source code
-COPY frontend/editorfront/ ./
+# Fast build (no minification, source maps enabled)
+RUN npm run build -- --mode development
 
-# Build the React application
-RUN npm run build
-
-# Stage 2: Build Go backend
-FROM golang:1.24-alpine AS backend-builder
-
-WORKDIR /src
-
-# Copy backend module files to allow dependency download before copying entire repo
-COPY backend/go.mod backend/go.sum ./backend/
-
-# Install build deps and download modules inside the backend folder
+# Stage 2: Build Go backend (dev-optimized)
+FROM --platform=linux/arm64 golang:1.24-alpine AS backend-dev
 WORKDIR /src/backend
+
+# Install build deps and download modules only if go.mod changes
+COPY backend/go.mod backend/go.sum ./
 RUN apk add --no-cache git ca-certificates && \
     go env -w GOPROXY=https://proxy.golang.org && \
     go mod download
 
-# Ensure we copy repository into /src (not into /src/backend)
-WORKDIR /src
-# Copy the backend source
-COPY backend/ ./backend/
+# Copy backend source (only .go files for fast rebuilds)
+COPY backend/*.go ./
 
-# Build the backend binary
-WORKDIR /src/backend
-# Build for native architecture (no cross-compilation args needed)
+# Fast build (no CGO, no optimizations)
 RUN CGO_ENABLED=0 go build -o traefik-dynamic-editor
 
-### Runtime image
-FROM alpine:3.18
+# Runtime image (same as prod)
+FROM --platform=linux/arm64 alpine:3.18
 RUN apk add --no-cache ca-certificates
-
 WORKDIR /app/backend
 
-# Copy binary from backend builder
-COPY --from=backend-builder /src/backend/traefik-dynamic-editor .
+COPY --from=backend-dev /src/backend/traefik-dynamic-editor .
+COPY --from=frontend-dev /src/frontend/editorfront/dist /app/frontend/editorfront/dist
 
-# Copy built frontend dist files from frontend builder
-COPY --from=frontend-builder /src/frontend/editorfront/dist /app/frontend/editorfront/dist
-
-# Expose port used by the app
 EXPOSE 8010
-
-# Default environment variables
 ENV PORT=8010 \
     DYNAMIC_CONFIG_PATH=../dynamic/dynamic.yml \
     TRAEFIK_CONFIG_PATH=../config/traefik.yml
+
+HEALTHCHECK --interval=10s --timeout=2s --start-period=5s CMD wget -qO- http://127.0.0.1:8010/health || exit 1
 
 CMD ["./traefik-dynamic-editor"]
