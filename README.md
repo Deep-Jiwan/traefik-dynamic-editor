@@ -34,9 +34,9 @@ Current Status
 - 🐳 **Docker Ready**: Containerized for easy deployment
 
 ## Screenshots
-<img width="1919" height="916" alt="image" src="https://github.com/user-attachments/assets/a29a7fb7-79a0-48e0-8f61-513d4287b58a" />
+<img width="1919" height="910" alt="image" src="https://github.com/user-attachments/assets/e8be4340-e7f1-4eae-ba0f-58cc6773a0f9" />
 
-<img width="1913" height="916" alt="image" src="https://github.com/user-attachments/assets/06d2e46e-0a80-4c67-9e22-26ac9ecc48be" />
+<img width="1919" height="913" alt="image" src="https://github.com/user-attachments/assets/31afff89-6e05-477b-8229-e4bd99186968" />
 
 
 ## Architecture
