@@ -1,0 +1,111 @@
+{
+  "middlewares": [
+    {
+      "name": "authelia-dev@docker",
+      "status": "enabled",
+      "provider": "docker",
+      "type": "forwardauth"
+    },
+    {
+      "name": "authelia@docker",
+      "status": "enabled",
+      "provider": "docker",
+      "type": "forwardauth"
+    },
+    {
+      "name": "compress@file",
+      "status": "enabled",
+      "provider": "file",
+      "type": "compress"
+    },
+    {
+      "name": "dashboard_redirect@internal",
+      "status": "enabled",
+      "provider": "internal",
+      "type": "redirectregex"
+    },
+    {
+      "name": "dashboard_stripprefix@internal",
+      "status": "enabled",
+      "provider": "internal",
+      "type": "stripprefix"
+    },
+    {
+      "name": "default-auth@file",
+      "status": "enabled",
+      "provider": "file",
+      "type": "chain"
+    },
+    {
+      "name": "default-chain@file",
+      "status": "enabled",
+      "provider": "file",
+      "type": "chain"
+    },
+    {
+      "name": "default-secure-auth@file",
+      "status": "enabled",
+      "provider": "file",
+      "type": "chain"
+    },
+    {
+      "name": "default-secure-chain@file",
+      "status": "enabled",
+      "provider": "file",
+      "type": "chain"
+    },
+    {
+      "name": "https-redirect@docker",
+      "status": "enabled",
+      "provider": "docker",
+      "type": "redirectscheme"
+    },
+    {
+      "name": "ratelimit-hard@file",
+      "status": "enabled",
+      "provider": "file",
+      "type": "ratelimit"
+    },
+    {
+      "name": "ratelimit-soft@file",
+      "status": "enabled",
+      "provider": "file",
+      "type": "ratelimit"
+    },
+    {
+      "name": "redirect-https@file",
+      "status": "enabled",
+      "provider": "file",
+      "type": "redirectscheme"
+    },
+    {
+      "name": "secure-headers@file",
+      "status": "enabled",
+      "provider": "file",
+      "type": "headers"
+    }
+  ],
+  "uses_auth": [
+    {
+      "router_name": "editor",
+      "uses_auth": false
+    },
+    {
+      "router_name": "portainer",
+      "uses_auth": false
+    },
+    {
+      "router_name": "test",
+      "uses_auth": false
+    },
+    {
+      "router_name": "vmui",
+      "uses_auth": false
+    },
+    {
+      "router_name": "waha",
+      "uses_auth": false
+    }
+  ],
+  "lastUpdated": "2025-12-05T18:03:32Z"
+}

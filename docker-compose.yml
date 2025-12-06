@@ -17,6 +17,8 @@ services:
       - PORT=8010
       - DYNAMIC_CONFIG_PATH=../dynamic/dynamic.yml
       - TRAEFIK_CONFIG_PATH=../config/traefik.yaml
+      - TRAEFIK_DASHBOARD_URL=http://dashboard-deep.adgone.co.tz
+      # Set to your Traefik dashboard URL (e.g., http://traefik:8080 or http://host.docker.internal:8080)
     volumes:
       - /var/lib/docker/volumes/traefik/dynamic:/app/dynamic:rw
       - /var/lib/docker/volumes/traefik/config:/app/config:rw

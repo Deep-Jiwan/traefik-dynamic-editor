@@ -54,3 +54,8 @@ node_modules
 run-app.ps1
 theme.md
 other/
+IMPLEMENTATION_NOTES.md
+ROUTER_EDIT_FIX.md
+test-discovery.ps1
+test-discovery.sh
+discovery.json

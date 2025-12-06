@@ -1,7 +1,0 @@
-middlewares:
-  - name: name-of-your-middleware
-    type: what-type-is-this-auth-blocking-etc
-    description: describe your middleware here
-  - name: authelia@docker
-    type: auth
-    description: describe your middleware here

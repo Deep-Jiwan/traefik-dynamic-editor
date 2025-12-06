@@ -12,15 +12,21 @@ $rootDir = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $backendDir = Join-Path $rootDir "backend"
 $frontendDir = Join-Path (Join-Path $rootDir "frontend") "editorfront"
 
+# Set environment variables for Traefik Dashboard discovery (optional)
+# Update this to your actual Traefik dashboard URL if available
+$env:TRAEFIK_DASHBOARD_URL = "http://localhost:8080"
+
 # Track running jobs
 $jobs = @()
 
 try {
     # Start backend service
     Write-Host "[Backend] Starting Go service..." -ForegroundColor Cyan
+    Write-Host "[Backend] TRAEFIK_DASHBOARD_URL: $env:TRAEFIK_DASHBOARD_URL" -ForegroundColor Gray
     $backendJob = Start-Job -ScriptBlock {
         Set-Location $using:backendDir
-        & go run main.go
+        $env:TRAEFIK_DASHBOARD_URL = $using:env:TRAEFIK_DASHBOARD_URL
+        & go run .
     } -Name "backend-service"
     $jobs += $backendJob
     Write-Host "[Backend] Started (Job ID: $($backendJob.Id))" -ForegroundColor Green

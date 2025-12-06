@@ -50,7 +50,9 @@ export interface WebSocketMessage {
 export interface Middleware {
   name: string
   type: string
-  description: string
+  description?: string
+  status?: string
+  provider?: string
 }
 
 export interface RouterFormData {
@@ -60,6 +62,5 @@ export interface RouterFormData {
   serviceUrl: string
   entryPoints: string[]
   tlsEnabled: boolean
-  authEnabled: boolean
-  authMiddleware: string
+  middlewares: string[]
 }

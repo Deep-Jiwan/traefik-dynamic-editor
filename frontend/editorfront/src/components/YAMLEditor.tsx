@@ -70,9 +70,21 @@ export const YAMLEditor = ({ isOpen, onClose, onSave, title = 'Edit Configuratio
     setError('')
     try {
       const apiBase = getApiBase()
-      const response = await fetch(`${apiBase}/${endpoint}`)
+      // Add timestamp to bust cache and no-cache headers
+      const response = await fetch(`${apiBase}/${endpoint}?t=${Date.now()}`, {
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        }
+      })
       if (!response.ok) throw new Error('Failed to fetch YAML content')
-      const text = await response.text()
+      let text = await response.text()
+      
+      // If empty or whitespace only, provide default template with empty lines
+      if (!text || text.trim() === '') {
+        text = 'http:\n  routers: {}\n  services: {}\n\n\n'
+      }
+      
       setYamlContent(text)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -122,8 +134,8 @@ export const YAMLEditor = ({ isOpen, onClose, onSave, title = 'Edit Configuratio
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Failed to save YAML')
+        const errorText = await response.text()
+        throw new Error(errorText || 'Failed to save YAML')
       }
 
       // Fetch updated config to pass to onSave

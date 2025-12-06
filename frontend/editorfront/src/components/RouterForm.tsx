@@ -1,8 +1,9 @@
 import { useState, FormEvent, useEffect } from 'react'
 import useSWR from 'swr'
-import { FiChevronDown } from 'react-icons/fi'
+import { FiX, FiPlus } from 'react-icons/fi'
 import { Button } from './Button'
 import { Checkbox } from './Checkbox'
+import { MiddlewareSelector } from './MiddlewareSelector'
 import type { RouterFormData, Router, Config, Middleware } from '../types/traefik'
 import { getApiBase } from '../utils/config'
 
@@ -20,22 +21,29 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
     serviceUrl: '',
     entryPoints: ['websecure'],
     tlsEnabled: true,
-    authEnabled: false,
-    authMiddleware: '',
+    middlewares: [],
   })
+  const [showMiddlewareSelector, setShowMiddlewareSelector] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const apiBase = getApiBase()
   
-  // Fetch available middlewares
-  const { data: middlewares } = useSWR<Middleware[]>(`${apiBase}/middlewares`)
+  // Fetch available middlewares with optimized revalidation
+  const { data: middlewares } = useSWR<Middleware[]>(`${apiBase}/middlewares`, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  })
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape to cancel
+      // Escape to cancel (or close modal)
       if (e.key === 'Escape') {
-        onCancel()
+        if (showMiddlewareSelector) {
+          setShowMiddlewareSelector(false)
+        } else {
+          onCancel()
+        }
       }
       // Ctrl+S or Cmd+S to save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -49,7 +57,7 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onCancel])
+  }, [onCancel, showMiddlewareSelector])
 
   useEffect(() => {
     if (routerName) {
@@ -67,11 +75,15 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
       const config: Config = await configResponse.json()
 
       const host = router.rule.match(/Host\(`([^`]+)`\)/)?.[1] || ''
-      const service = config.http.services[router.service]
-      const serviceUrl = service?.loadBalancer.servers[0]?.url || ''
+      
+      // Get the service and backend URL
+      let serviceUrl = ''
+      if (config.http?.services?.[router.service]) {
+        const service = config.http.services[router.service]
+        serviceUrl = service?.loadBalancer?.servers?.[0]?.url || ''
+      }
 
-      const hasAuth = !!(router.middlewares && router.middlewares.length > 0)
-      const authMiddleware = hasAuth && router.middlewares ? router.middlewares[0] : ''
+      console.log('Router Data:', { name, host, service: router.service, config: config.http?.services })
 
       setFormData({
         name,
@@ -80,8 +92,7 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
         serviceUrl,
         entryPoints: router.entryPoints,
         tlsEnabled: router.tls !== null,
-        authEnabled: hasAuth,
-        authMiddleware: authMiddleware,
+        middlewares: router.middlewares || [],
       })
     } catch (error) {
       console.error('Error loading router:', error)
@@ -100,9 +111,7 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
         rule: `Host(\`${formData.host}\`)`,
         entryPoints: formData.entryPoints,
         service: formData.serviceName,
-        middlewares: formData.authEnabled && formData.authMiddleware 
-          ? [formData.authMiddleware] 
-          : undefined,
+        middlewares: formData.middlewares.length > 0 ? formData.middlewares : undefined,
         tls: formData.tlsEnabled ? { certResolver: 'cloudflare' } : null,
       }
 
@@ -163,19 +172,21 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div>
-        <label className="block text-xs font-medium text-white mb-1">Router Name</label>
-        <input
-          type="text"
-          value={formData.name}
-          onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-          disabled={!!routerName}
-          className="w-full px-3 py-2 text-sm bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-1 focus:ring-[#2aa2c1] focus:border-transparent text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          placeholder="my-service-router"
-          required
-        />
-        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-0.5">Unique identifier for this router</p>
-      </div>
+      {!showMiddlewareSelector && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-white mb-1">Router Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+              disabled={!!routerName}
+              className="w-full px-3 py-2 text-sm bg-[#081727] border border-[#2f3d4d] rounded-lg focus:ring-1 focus:ring-[#2aa2c1] focus:border-transparent text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              placeholder="my-service-router"
+              required
+            />
+            <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-0.5">Unique identifier for this router</p>
+          </div>
 
       <div>
         <label className="block text-xs font-medium text-white mb-1">Host Rule</label>
@@ -235,55 +246,76 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-white mb-1.5">TLS & Authentication</label>
-        <div className="space-y-2">
-          <Checkbox
-            checked={formData.tlsEnabled}
-            onChange={(checked) => setFormData((prev) => ({ ...prev, tlsEnabled: checked }))}
-            label="Enable TLS"
-          />
-          
-          <Checkbox
-            checked={formData.authEnabled}
-            onChange={(checked) =>
-              setFormData((prev) => ({ 
-                ...prev, 
-                authEnabled: checked,
-                authMiddleware: checked ? (middlewares?.filter(m => m.type === 'auth')[0]?.name || '') : ''
-              }))
-            }
-            label="Enable Authentication"
-          />
-        </div>
+        <label className="block text-xs font-medium text-white mb-1.5">TLS</label>
+        <Checkbox
+          checked={formData.tlsEnabled}
+          onChange={(checked) => setFormData((prev) => ({ ...prev, tlsEnabled: checked }))}
+          label="Enable TLS"
+        />
       </div>
 
-      {formData.authEnabled && (
-        <div>
-          <div className="relative">
-            <select
-              value={formData.authMiddleware}
-              onChange={(e) => setFormData((prev) => ({ ...prev, authMiddleware: e.target.value }))}
-              className="w-full px-3 py-2 text-sm bg-[#0d1b2a] border-2 border-[#2f3d4d] rounded-lg focus:ring-1 focus:ring-[#2aa2c1] focus:border-[#2aa2c1] text-white appearance-none cursor-pointer hover:border-[#2aa2c1]/50 transition-colors pr-10"
-              required={formData.authEnabled}
-              style={{
-                backgroundImage: 'none',
-              }}
-            >
-              <option value="" className="bg-[#1e2b39] text-white">Select middleware...</option>
-              {middlewares?.filter(m => m.type === 'auth').map((middleware) => (
-                <option key={middleware.name} value={middleware.name} className="bg-[#1e2b39] text-white">
-                  {middleware.name}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              <FiChevronDown className="w-4 h-4 text-[hsla(0,0%,100%,0.51)]" />
-            </div>
-          </div>
-          <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-0.5">
-            Choose your authentication middleware. Create one using Edit Components
-          </p>
+      <div>
+        <label className="block text-xs font-medium text-white mb-2">Middlewares</label>
+        
+        {/* Middleware Pills Display */}
+        <div className="bg-[#081727] border border-[#2f3d4d] rounded-lg p-3 mb-3 min-h-[2.5rem] flex flex-wrap gap-2 items-center">
+          {formData.middlewares.length === 0 ? (
+            <span className="text-xs text-[hsla(0,0%,100%,0.51)]">No middlewares selected</span>
+          ) : (
+            formData.middlewares.map((middleware) => (
+              <div
+                key={middleware}
+                className="inline-flex items-center gap-2 bg-[#2aa2c1] text-white px-3 py-1 rounded-full text-sm"
+              >
+                <span>{middleware}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      middlewares: prev.middlewares.filter((m) => m !== middleware),
+                    }))
+                  }
+                  className="hover:bg-[#1a7a96] rounded-full p-0.5 transition-colors"
+                >
+                  <FiX className="w-3 h-3" />
+                </button>
+              </div>
+            ))
+          )}
         </div>
+
+        {/* Open Middleware Selector Modal Button */}
+        <Button
+          type="button"
+          onClick={() => setShowMiddlewareSelector(true)}
+          variant="primary"
+          className="w-full flex items-center justify-center gap-2"
+        >
+          <FiPlus className="w-4 h-4" />
+          Manage Middlewares
+        </Button>
+
+        <p className="text-xs text-[hsla(0,0%,100%,0.51)] mt-2">
+          Selected middlewares will be applied to this router
+        </p>
+      </div>
+        </>
+      )}
+
+      {/* Middleware Selector Modal */}
+      {showMiddlewareSelector && middlewares && (
+        <MiddlewareSelector
+          available={middlewares}
+          selected={formData.middlewares}
+          onSelect={(selected) =>
+            setFormData((prev) => ({
+              ...prev,
+              middlewares: selected,
+            }))
+          }
+          onClose={() => setShowMiddlewareSelector(false)}
+        />
       )}
 
       <div className="flex gap-3 pt-3">

@@ -1,5 +1,5 @@
 import { FiEdit, FiTrash2, FiExternalLink, FiLock, FiCopy } from 'react-icons/fi'
-import type { Router } from '../types/traefik'
+import type { Router, Middleware } from '../types/traefik'
 import { StatusBadge } from './StatusBadge'
 import { useServiceStatus } from '../hooks/useServiceStatus'
 import { useToast } from '../contexts/ToastContext'
@@ -15,17 +15,53 @@ interface RouterRowProps {
   statusTrigger?: number
 }
 
+interface DiscoveryAuthInfo {
+  router_name: string
+  uses_auth: boolean
+}
+
+interface DiscoveryData {
+  middlewares: Middleware[]
+  uses_auth: DiscoveryAuthInfo[]
+  lastUpdated: string
+}
+
 export const RouterRow = ({ name, router, onEdit, onDelete, statusTrigger = 0 }: RouterRowProps) => {
   const { showToast } = useToast()
   const apiBase = getApiBase()
-  const { data: config } = useSWR<Config>(`${apiBase}/config`)
+  
+  // Config is fetched with revalidation settings
+  const { data: config } = useSWR<Config>(`${apiBase}/config`, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  })
+  
+  // Get full discovery data to check middleware types
+  const { data: discoveryData } = useSWR<DiscoveryData>(`${apiBase}/discovery`, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  })
   
   const host = router.rule.match(/Host\(`([^`]+)`\)/)?.[1] || 'Unknown'
   const hasTLS = router.tls !== null && router.tls !== undefined
-  const hasAuth = router.middlewares && router.middlewares.length > 0
+  
+  // Check auth status from multiple sources:
+  // 1. Check discovery auth list (from API inspection)
+  const authInfo = discoveryData?.uses_auth?.find(a => a.router_name === name)
+  const hasAuthFromDiscovery = authInfo?.uses_auth ?? false
+  
+  // 2. Check if router has any forwardAuth middleware directly
+  const hasForwardAuthMiddleware = router.middlewares?.some(mw => {
+    const middleware = discoveryData?.middlewares?.find(m => m.name === mw)
+    return middleware?.type?.toLowerCase() === 'forwardauth'
+  }) ?? false
+  
+  // Show padlock if either check is true
+  const hasAuth = hasAuthFromDiscovery || hasForwardAuthMiddleware
+  
   const scheme = hasTLS ? 'https' : 'http'
   const fullUrl = host !== 'Unknown' ? `${scheme}://${host}` : ''
-  const backendUrl = config?.http.services[router.service]?.loadBalancer.servers[0]?.url || ''
+  const backendUrl = config?.http?.services?.[router.service]?.loadBalancer?.servers?.[0]?.url || ''
 
   const serviceStatus = useServiceStatus(host !== 'Unknown' ? host : null, scheme, statusTrigger)
 

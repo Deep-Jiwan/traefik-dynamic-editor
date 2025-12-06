@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import useSWR from 'swr'
+import useSWR, { mutate } from 'swr'
 import { FiPlus, FiAlertTriangle, FiSearch, FiX, FiRefreshCw, FiEdit } from 'react-icons/fi'
 import { Helmet } from 'react-helmet-async'
 import { getApiBase } from '../utils/config'
@@ -21,7 +21,6 @@ export const Dashboard = () => {
   const [isRouterModalOpen, setIsRouterModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isYAMLEditorOpen, setIsYAMLEditorOpen] = useState(false)
-  const [isComponentsEditorOpen, setIsComponentsEditorOpen] = useState(false)
   const [editingRouter, setEditingRouter] = useState<string | null>(null)
   const [deletingRouter, setDeletingRouter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -30,19 +29,23 @@ export const Dashboard = () => {
 
   const apiBase = getApiBase()
 
-  // Fetch routers
+  // Fetch routers with optimized settings
   const {
     data: routers,
     mutate: mutateRouters,
     error: routersError,
-  } = useSWR<Record<string, Router>>(`${apiBase}/routers`)
+  } = useSWR<Record<string, Router>>(`${apiBase}/routers`, {
+    revalidateOnFocus: false,
+  })
 
-  // Fetch entry points
+  // Fetch entry points with optimized settings
   const {
     data: entryPoints,
     mutate: mutateEntryPoints,
     error: entryPointsError,
-  } = useSWR<Record<string, EntryPoint>>(`${apiBase}/entrypoints`)
+  } = useSWR<Record<string, EntryPoint>>(`${apiBase}/entrypoints`, {
+    revalidateOnFocus: false,
+  })
 
   // WebSocket for real-time updates
   const { status: wsStatus } = useWebSocket(
@@ -53,9 +56,15 @@ export const Dashboard = () => {
           mutateEntryPoints()
           setStatusTrigger(prev => prev + 1)
           showToast('Configuration updated', 'info')
+        } else if (message.type === 'discovery-updated') {
+          // Revalidate discovery data when it updates
+          mutate(`${apiBase}/discovery/auth`)
+          mutate(`${apiBase}/middlewares`)
+          mutate(`${apiBase}/discovery`)
+          console.log('Discovery data updated via WebSocket')
         }
       },
-      [mutateRouters, mutateEntryPoints, showToast]
+      [mutateRouters, mutateEntryPoints, showToast, apiBase]
     )
   )
 
@@ -109,13 +118,31 @@ export const Dashboard = () => {
     showToast('Entry points are defined in traefik.yml config file', 'info')
   }
 
-  const handleRefreshStatus = () => {
+  const handleRefreshStatus = async () => {
     setIsRefreshing(true)
-    setStatusTrigger(prev => prev + 1)
-    setTimeout(() => {
+    try {
+      // Trigger manual discovery refresh first
+      await fetch(`${apiBase}/discovery/refresh`, { method: 'POST' })
+        .catch(err => console.warn('Discovery refresh trigger failed:', err))
+      
+      // Wait a moment for discovery to complete
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      // Revalidate all data sources in parallel
+      await Promise.all([
+        mutateRouters(), // Refresh routers
+        mutateEntryPoints(), // Refresh entry points
+        mutate(`${apiBase}/discovery`), // Refresh full discovery data (includes auth + middlewares)
+        mutate(`${apiBase}/middlewares`), // Refresh middlewares
+      ])
+      setStatusTrigger(prev => prev + 1) // Trigger service status refresh
+      showToast('All data refreshed', 'success')
+    } catch (error) {
+      console.error('Error refreshing data:', error)
+      showToast('Failed to refresh some data', 'error')
+    } finally {
       setIsRefreshing(false)
-      showToast('Service status refreshed', 'info')
-    }, 500)
+    }
   }
 
   const filteredRouters = routers
@@ -198,14 +225,7 @@ export const Dashboard = () => {
                     <FiEdit className="w-4 h-4" />
                     Edit Dynamic
                   </button>
-                  <button
-                    onClick={() => setIsComponentsEditorOpen(true)}
-                    className="px-3 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white hover:bg-[hsla(206,100%,50%,0.04)] transition-colors flex items-center gap-2"
-                    title="Edit components configuration"
-                  >
-                    <FiEdit className="w-4 h-4" />
-                    Edit Components
-                  </button>
+
                 </div>
                 <div className="flex gap-3">
                   <button
@@ -382,17 +402,7 @@ export const Dashboard = () => {
         endpoint="yaml"
       />
 
-      {/* Components Editor Modal */}
-      <YAMLEditor
-        isOpen={isComponentsEditorOpen}
-        onClose={() => setIsComponentsEditorOpen(false)}
-        onSave={() => {
-          showToast('Components configuration saved successfully', 'success')
-        }}
-        title="Edit Components Configuration"
-        description="Edit this app components. Add auto-discovered components from Traefik here. This file does not affect operation of Traefik. Just because a service is defined here does not mean it is available in Traefik."
-        endpoint="components"
-      />
+
     </>
   )
 }
