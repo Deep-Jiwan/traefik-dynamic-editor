@@ -8,29 +8,31 @@ name: build
 
 steps:
   - name: build-docker-image
-    image: plugins/docker:linux-arm64
-    settings:
-      repo: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor
-      tags:
-        - latest
-        - ${DRONE_COMMIT_SHA}
-        - autobuild
-      dockerfile: Dockerfile
-      registry: ghcr.io
-      platforms:
-        - linux/arm64
-      username:
+    image: docker:20.10-cli
+    environment:
+      DOCKER_BUILDKIT: 1     # Enable modern caching
+      GHCR_USERNAME:
         from_secret: ghcr_username
-      password:
+      GHCR_PASSWORD:
         from_secret: ghcr_token
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - echo $GHCR_PASSWORD | docker login ghcr.io -u $GHCR_USERNAME --password-stdin
 
-      # Enable Docker layer caching
-      buildkit: true
-      cache_from:
-        - ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest
-        - ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
-      cache_to:
-        - type=inline
+      - |
+          docker build \
+            --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest \
+            --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:${DRONE_COMMIT_SHA} \
+            --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild \
+            --cache-from ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest \
+            --cache-from ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild \
+            .
+      
+      - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest
+      - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:${DRONE_COMMIT_SHA}
+      - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
 
   - name: redeploy-stack
     image: appleboy/drone-ssh
@@ -68,3 +70,7 @@ steps:
         - echo "Cleaning temporary container..."
         - docker rm -f traefik-dynamic-backend-temp || true
 
+volumes:
+  - name: dockersock
+    host:
+      path: /var/run/docker.sock
