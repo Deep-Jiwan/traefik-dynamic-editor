@@ -25,11 +25,11 @@ services:
 
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8010/api/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8010/api/health"]
       interval: 30s
       timeout: 3s
       retries: 3
-      start_period: 10s
+      start_period: 30s
 
 networks:
   frontend:

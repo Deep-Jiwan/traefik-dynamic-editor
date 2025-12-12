@@ -37,7 +37,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o traefik-d
 
 # Runtime image
 FROM alpine:3.18
-RUN apk add --no-cache ca-certificates wget
+RUN apk add --no-cache ca-certificates wget curl
 WORKDIR /app/backend
 
 # Copy backend binary
@@ -52,7 +52,7 @@ ENV PORT=8010 \
     TRAEFIK_CONFIG_PATH=../config/traefik.yml \
     TRAEFIK_DASHBOARD_URL=""
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8010/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+  CMD curl -f http://127.0.0.1:8010/api/health || exit 1
 
 CMD ["./traefik-dynamic-editor"]
