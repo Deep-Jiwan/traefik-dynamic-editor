@@ -52,7 +52,7 @@ ENV PORT=8010 \
     TRAEFIK_CONFIG_PATH=../config/traefik.yml \
     TRAEFIK_DASHBOARD_URL=""
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=5s --timeout=4s --start-period=5s --retries=3 \
   CMD curl -f http://127.0.0.1:8010/api/health || exit 1
 
 CMD ["./traefik-dynamic-editor"]
