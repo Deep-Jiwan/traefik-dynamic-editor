@@ -21,6 +21,11 @@ steps:
     commands:
       - echo $GHCR_PASSWORD | docker login ghcr.io -u $GHCR_USERNAME --password-stdin
 
+      # Pull existing images to use cache
+      - docker pull ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest || true
+      - docker pull ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild || true
+
+      # Build with cache-from
       - |
           docker build \
             --tag ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest \
@@ -29,10 +34,12 @@ steps:
             --cache-from ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest \
             --cache-from ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild \
             .
-      
+
+      # Push all tags
       - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:latest
       - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:${DRONE_COMMIT_SHA}
       - docker push ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
+
 
   - name: redeploy-stack
     image: appleboy/drone-ssh

@@ -22,9 +22,14 @@ services:
     labels:
       - sablier.enable=true
       - sablier.group=config-services
-      - io.portainer.stack.endpoint="1"
-      - io.portainer.stack.name="traefik-dynamic-backend"
+
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8010/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
 networks:
   frontend:

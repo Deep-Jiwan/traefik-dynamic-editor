@@ -53,6 +53,6 @@ ENV PORT=8010 \
     TRAEFIK_DASHBOARD_URL=""
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8010/api/ping || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8010/api/health || exit 1
 
 CMD ["./traefik-dynamic-editor"]

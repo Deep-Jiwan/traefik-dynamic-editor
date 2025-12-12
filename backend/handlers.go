@@ -444,6 +444,12 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// GET /api/health - simple health check
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
 // GET /api/routers/{name}/auth - Check if router uses authentication
 func checkRouterAuthStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

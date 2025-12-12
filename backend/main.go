@@ -44,6 +44,7 @@ func main() {
 	api.HandleFunc("/yaml", getYAML).Methods("GET")
 	api.HandleFunc("/yaml", updateYAML).Methods("PUT")
 	api.HandleFunc("/ping", pingHandler).Methods("GET")
+	api.HandleFunc("/health", healthHandler).Methods("GET")
 	api.HandleFunc("/entrypoints", getEntryPoints).Methods("GET")
 	api.HandleFunc("/routers", listRouters).Methods("GET")
 	api.HandleFunc("/routers/{name}", getRouter).Methods("GET")
