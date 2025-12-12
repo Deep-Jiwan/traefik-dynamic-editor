@@ -15,6 +15,9 @@ services:
     volumes:
       - /var/lib/docker/volumes/traefik/dynamic:/app/dynamic:rw
       - /var/lib/docker/volumes/traefik/config:/app/config:rw
+    
+    networks:
+      - frontend
 
     labels:
       - sablier.enable=true
@@ -22,3 +25,7 @@ services:
       - io.portainer.stack.endpoint="1"
       - io.portainer.stack.name="traefik-dynamic-backend"
     restart: unless-stopped
+
+networks:
+  frontend:
+    external: true
