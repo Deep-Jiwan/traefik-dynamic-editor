@@ -1,8 +1,10 @@
+name: traefik-config-editor
+
 services:
-  traefik-dynamic-backend-git:
+  traefik-dynamic-backend:
     platform: linux/arm64
     image: ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
-    container_name: traefik-dynamic-backend2
+    container_name: traefik-dynamic-backend
     ports:
       - "8010:8010"
     environment:
@@ -13,4 +15,10 @@ services:
     volumes:
       - /var/lib/docker/volumes/traefik/dynamic:/app/dynamic:rw
       - /var/lib/docker/volumes/traefik/config:/app/config:rw
+
+    labels:
+      - sablier.enable=true
+      - sablier.group=config-services
+      - io.portainer.stack.endpoint="1"
+      - io.portainer.stack.name="traefik-dynamic-backend"
     restart: unless-stopped

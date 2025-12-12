@@ -44,31 +44,24 @@ steps:
       key:
         from_secret: SSH_KEY
       script:
-        - echo "Downloading latest stack file..."
-        - curl -L -o docker-compose-deploy.yml https://raw.githubusercontent.com/Deep-Jiwan/traefik-dynamic-editor/main/docker-compose-deploy.yml
+        - echo "Switching to compose directory..."
+        - cd /home/adgpi0/user-docker/compose/
 
-        - echo "Pulling latest image..."
-        - docker compose -f docker-compose-deploy.yml pull
+        - echo "Ensuring service directory exists..."
+        - mkdir -p traefik-dynamic-backend
+        - cd traefik-dynamic-backend
 
-        # 1. Start a temporary container for rolling update
-        - echo "Starting temporary container..."
-        - docker run -d --name traefik-dynamic-backend-temp ghcr.io/deep-jiwan/mypackages/traefik-dynamic-editor:autobuild
+        - echo "Downloading latest docker compose file (overriding always)..."
+        - curl -L -o docker-compose.yml https://raw.githubusercontent.com/Deep-Jiwan/traefik-dynamic-editor/main/docker-compose-deploy.yml
 
-        # 2. Wait for new container to be healthy (adjust if you need)
-        - echo "Waiting 5s for temporary container..."
-        - sleep 5
+        - echo "Pulling latest images..."
+        - docker compose pull
 
-        # 3. Remove the old main container
-        - echo "Removing old container..."
-        - docker rm -f traefik-dynamic-backend2 || true  
+        - echo "Recreating container (rolling update)..."
+        - docker compose up -d --force-recreate
 
-        # 4. Recreate your main container cleanly using compose
-        - echo "Starting main container from compose..."
-        - docker compose -f docker-compose-deploy.yml up -d --force-recreate
+        - echo "Deployment completed successfully."
 
-        # 5. Remove the temporary container
-        - echo "Cleaning temporary container..."
-        - docker rm -f traefik-dynamic-backend-temp || true
 
 volumes:
   - name: dockersock
