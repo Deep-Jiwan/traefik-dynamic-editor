@@ -80,7 +80,6 @@ func DiscoverMiddlewares(dashboardURL string) error {
 	}
 
 	if err := json.Unmarshal(body, &traefikMiddlewares); err != nil {
-		log.Printf("Debug: Response body: %s", string(body))
 		return fmt.Errorf("failed to parse Traefik response: %w", err)
 	}
 
@@ -142,13 +141,11 @@ func CheckRouterAuth(dashboardURL string, routerName string) (bool, error) {
 
 		resp, err := client.Get(routerURL)
 		if err != nil {
-			log.Printf("Debug: Failed to get router %s: %v", name, err)
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			log.Printf("Debug: Router %s not found (status %d)", name, resp.StatusCode)
 			continue
 		}
 
@@ -158,12 +155,10 @@ func CheckRouterAuth(dashboardURL string, routerName string) (bool, error) {
 		}
 
 		if err := json.Unmarshal(body, &routerData); err != nil {
-			log.Printf("Debug: Failed to parse router data for %s: %v", name, err)
 			continue
 		}
 
 		found = true
-		log.Printf("Debug: Found router %s with middlewares: %v", name, routerData["middlewares"])
 		break
 	}
 
@@ -175,16 +170,12 @@ func CheckRouterAuth(dashboardURL string, routerName string) (bool, error) {
 	// Check if middlewares field exists and contains any middlewares
 	middlewares, ok := routerData["middlewares"].([]interface{})
 	if !ok || len(middlewares) == 0 {
-		log.Printf("Debug: Router %s has no middlewares", routerName)
 		return false, nil
 	}
-
-	log.Printf("Debug: Checking %d middlewares for router %s", len(middlewares), routerName)
 
 	// Check each middleware for forwardAuth type
 	for _, m := range middlewares {
 		middlewareName := fmt.Sprintf("%v", m)
-		log.Printf("Debug: Checking middleware %s", middlewareName)
 
 		// Get middleware details
 		middlewareURL := dashboardURL + "/api/http/middlewares/" + middlewareName
@@ -193,28 +184,22 @@ func CheckRouterAuth(dashboardURL string, routerName string) (bool, error) {
 		}
 		resp, err := client.Get(middlewareURL)
 		if err != nil {
-			log.Printf("Debug: Failed to get middleware %s: %v", middlewareName, err)
 			continue
 		}
 
 		middlewareBody, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			log.Printf("Debug: Failed to read middleware body for %s: %v", middlewareName, err)
 			continue
 		}
 
 		var middlewareData map[string]interface{}
 		if err := json.Unmarshal(middlewareBody, &middlewareData); err != nil {
-			log.Printf("Debug: Failed to parse middleware data for %s: %v", middlewareName, err)
 			continue
 		}
 
-		log.Printf("Debug: Middleware %s data: %v", middlewareName, middlewareData)
-
 		// Check if this middleware is a forwardAuth type
 		if middlewareType, ok := middlewareData["type"].(string); ok {
-			log.Printf("Debug: Middleware %s type: %s", middlewareName, middlewareType)
 			if strings.EqualFold(middlewareType, "forwardauth") {
 				log.Printf("Info: Router %s uses forwardAuth middleware: %s", routerName, middlewareName)
 				return true, nil
@@ -222,7 +207,6 @@ func CheckRouterAuth(dashboardURL string, routerName string) (bool, error) {
 		}
 	}
 
-	log.Printf("Info: Router %s does not use forwardAuth", routerName)
 	return false, nil
 }
 
