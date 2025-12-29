@@ -507,3 +507,79 @@ func triggerDiscoveryRefresh(w http.ResponseWriter, r *http.Request) {
 		"status":  "success",
 	})
 }
+
+// POST /api/middleware/{name} - Create or update a middleware file
+func createOrUpdateMiddleware(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	name := vars["name"]
+
+	if name == "" {
+		http.Error(w, "Middleware name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Read the YAML content from the request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate it's valid YAML
+	var yamlData interface{}
+	if err := yaml.Unmarshal(body, &yamlData); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid YAML: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Write to middleware file
+	dir := filepath.Dir(configPath)
+	middlewarePath := filepath.Join(dir, fmt.Sprintf("middleware-%s.yml", name))
+
+	if err := os.WriteFile(middlewarePath, body, 0644); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to write middleware file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Created/updated middleware file: %s", middlewarePath)
+
+	// Notify clients via WebSocket
+	notifyConfigUpdate()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Middleware saved"})
+}
+
+// DELETE /api/middleware/{name} - Delete a middleware file
+func deleteMiddleware(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	name := vars["name"]
+
+	if name == "" {
+		http.Error(w, "Middleware name is required", http.StatusBadRequest)
+		return
+	}
+
+	dir := filepath.Dir(configPath)
+	middlewarePath := filepath.Join(dir, fmt.Sprintf("middleware-%s.yml", name))
+
+	// Check if file exists
+	if _, err := os.Stat(middlewarePath); os.IsNotExist(err) {
+		http.Error(w, "Middleware file not found", http.StatusNotFound)
+		return
+	}
+
+	// Delete the file
+	if err := os.Remove(middlewarePath); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to delete middleware file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Deleted middleware file: %s", middlewarePath)
+
+	// Notify clients via WebSocket
+	notifyConfigUpdate()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Middleware deleted"})
+}

@@ -49,6 +49,8 @@ func main() {
 	api.HandleFunc("/routers/{name}", createOrUpdateRouter).Methods("POST", "PUT")
 	api.HandleFunc("/routers/{name}", deleteRouter).Methods("DELETE")
 	api.HandleFunc("/middlewares", getMiddlewares).Methods("GET")
+	api.HandleFunc("/middleware/{name}", createOrUpdateMiddleware).Methods("POST", "PUT")
+	api.HandleFunc("/middleware/{name}", deleteMiddleware).Methods("DELETE")
 	api.HandleFunc("/routers/{name}/auth", checkRouterAuthStatus).Methods("GET")
 	api.HandleFunc("/discovery", getDiscovery).Methods("GET")
 	api.HandleFunc("/discovery/auth", getDiscoveryAuth).Methods("GET")

@@ -58,3 +58,26 @@ func notifyDiscoveryUpdate(discovery *DiscoveryData) {
 	}
 	log.Println("Discovery update sent to", len(wsClients), "WebSocket clients")
 }
+
+// notifyConfigUpdate sends config update notification to all WebSocket clients
+func notifyConfigUpdate() {
+	message, err := json.Marshal(map[string]interface{}{
+		"type": "config-updated",
+	})
+	if err != nil {
+		log.Println("Error marshaling config notification:", err)
+		return
+	}
+
+	wsMutex.Lock()
+	defer wsMutex.Unlock()
+
+	for client := range wsClients {
+		if err := client.WriteMessage(websocket.TextMessage, message); err != nil {
+			log.Println("Error sending config update to client:", err)
+			client.Close()
+			delete(wsClients, client)
+		}
+	}
+	log.Println("Config update sent to", len(wsClients), "WebSocket clients")
+}

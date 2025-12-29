@@ -10,15 +10,19 @@ import { ConnectionStatus } from '../components/ConnectionStatus'
 import { Button } from '../components/Button'
 import { Modal } from '../components/Modal'
 import { RouterForm } from '../components/RouterForm'
+import { MiddlewareForm } from '../components/MiddlewareForm'
 import { RoutersTable } from '../components/RoutersTable'
 import { RouterRow } from '../components/RouterRow'
 import { EmptyState } from '../components/EmptyState'
 
 export const Dashboard = () => {
   const { showToast } = useToast()
+  const [activeTab, setActiveTab] = useState<'routers' | 'middlewares'>('routers')
   const [isRouterModalOpen, setIsRouterModalOpen] = useState(false)
+  const [isMiddlewareModalOpen, setIsMiddlewareModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [editingRouter, setEditingRouter] = useState<string | null>(null)
+  const [editingMiddleware, setEditingMiddleware] = useState<string | null>(null)
   const [deletingRouter, setDeletingRouter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -60,6 +64,19 @@ export const Dashboard = () => {
     setIsRouterModalOpen(true)
   }
 
+  const handleAddMiddleware = () => {
+    setEditingMiddleware(null)
+    setIsMiddlewareModalOpen(true)
+  }
+
+  const handleAdd = () => {
+    if (activeTab === 'routers') {
+      handleAddRouter()
+    } else {
+      handleAddMiddleware()
+    }
+  }
+
   const handleEditRouter = (name: string) => {
     setEditingRouter(name)
     setIsRouterModalOpen(true)
@@ -76,6 +93,14 @@ export const Dashboard = () => {
     mutateRouters()
     setStatusTrigger(prev => prev + 1)
     showToast('Router saved successfully', 'success')
+  }
+
+  const handleMiddlewareSuccess = () => {
+    setIsMiddlewareModalOpen(false)
+    setEditingMiddleware(null)
+    mutate(`${apiBase}/middlewares`)
+    mutate(`${apiBase}/discovery`)
+    showToast('Middleware saved successfully', 'success')
   }
 
   const confirmDelete = async () => {
@@ -162,28 +187,54 @@ export const Dashboard = () => {
               </div>
               <div className="flex items-center gap-3">
                 <ConnectionStatus status={wsStatus} />
-                <Button onClick={handleAddRouter} variant="primary">
-                  <div className="flex items-center gap-2">
+                <Button onClick={handleAdd} variant="primary" className="w-[180px]">
+                  <div className="flex items-center justify-center gap-2">
                     <FiPlus className="w-4 h-4" />
-                    Add Router
+                    {activeTab === 'routers' ? 'Add Router' : 'Add Middleware'}
                   </div>
                 </Button>
               </div>
             </div>
           </div>
 
+          {/* Tabs */}
+          <div className="mb-6 flex gap-2">
+            <button
+              onClick={() => setActiveTab('routers')}
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors rounded-lg ${
+                activeTab === 'routers'
+                  ? 'text-white bg-[#2aa2c1]'
+                  : 'text-[hsla(0,0%,100%,0.51)] bg-[#1e2b39] hover:text-white hover:bg-[#2aa2c1]/70'
+              }`}
+            >
+              Routers
+            </button>
+            <button
+              onClick={() => setActiveTab('middlewares')}
+              className={`flex-1 px-6 py-3 text-sm font-medium transition-colors rounded-lg ${
+                activeTab === 'middlewares'
+                  ? 'text-white bg-[#2aa2c1]'
+                  : 'text-[hsla(0,0%,100%,0.51)] bg-[#1e2b39] hover:text-white hover:bg-[#2aa2c1]/70'
+              }`}
+            >
+              Middlewares
+            </button>
+          </div>
+
 
           {/* Routers Section */}
-          {routersError && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-8">
-              Failed to load routers
-            </div>
-          )}
-
-          {!hasRouters && !routersError && <EmptyState onAddClick={handleAddRouter} />}
-
-          {hasRouters && (
+          {activeTab === 'routers' && (
             <>
+              {routersError && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-8">
+                  Failed to load routers
+                </div>
+              )}
+
+              {!hasRouters && !routersError && <EmptyState onAddClick={handleAddRouter} />}
+
+              {hasRouters && (
+                <>
               {/* Search Bar & Actions */}
               <div className="mb-4 flex justify-end gap-3">
                 <div className="flex gap-3">
@@ -285,7 +336,19 @@ export const Dashboard = () => {
                   </table>
                 </div>
               )}
+                </>
+              )}
             </>
+          )}
+
+          {/* Middlewares Section */}
+          {activeTab === 'middlewares' && (
+            <div className="bg-[#1e2b39] rounded-lg shadow-md p-8">
+              <div className="text-center text-[hsla(0,0%,100%,0.51)]">
+                <p className="text-lg mb-2">Middleware Management</p>
+                <p className="text-sm">Middleware table coming soon...</p>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -306,6 +369,26 @@ export const Dashboard = () => {
           onCancel={() => {
             setIsRouterModalOpen(false)
             setEditingRouter(null)
+          }}
+        />
+      </Modal>
+
+      {/* Middleware Modal */}
+      <Modal
+        isOpen={isMiddlewareModalOpen}
+        onClose={() => {
+          setIsMiddlewareModalOpen(false)
+          setEditingMiddleware(null)
+        }}
+        title={editingMiddleware ? 'Edit Middleware' : 'Add Middleware'}
+        description="Create or edit a middleware configuration"
+      >
+        <MiddlewareForm
+          middlewareName={editingMiddleware}
+          onSuccess={handleMiddlewareSuccess}
+          onCancel={() => {
+            setIsMiddlewareModalOpen(false)
+            setEditingMiddleware(null)
           }}
         />
       </Modal>
@@ -344,6 +427,19 @@ export const Dashboard = () => {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Middleware Modal */}
+      <Modal
+        isOpen={isMiddlewareModalOpen}
+        onClose={() => setIsMiddlewareModalOpen(false)}
+        title={editingMiddleware ? `Edit Middleware: ${editingMiddleware}` : 'Create New Middleware'}
+      >
+        <MiddlewareForm
+          middlewareName={editingMiddleware}
+          onSuccess={handleMiddlewareSuccess}
+          onCancel={() => setIsMiddlewareModalOpen(false)}
+        />
       </Modal>
     </>
   )
