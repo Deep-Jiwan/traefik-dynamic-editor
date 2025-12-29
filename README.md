@@ -1,5 +1,3 @@
-<img width="1919" height="913" alt="image" src="https://github.com/user-attachments/assets/be9749bc-478f-4a25-9f5e-608d3383d1b1" /># Traefik Dynamic Config Editor
-
 A fast, minimal, and modern web dashboard for managing Traefik's dynamic configuration.
 Why Use This?
 If you find Docker labels tedious for setting up Traefik routes but want the simplicity of editing dynamic.yml to add new services, this app is for you. It provides a clean web interface to manage your Traefik dynamic configuration without manually editing YAML files.  
