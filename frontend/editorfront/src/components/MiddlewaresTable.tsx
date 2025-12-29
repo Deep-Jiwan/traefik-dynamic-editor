@@ -1,5 +1,5 @@
 import useSWR from 'swr'
-import { FiCheckCircle, FiAlertTriangle, FiRefreshCw, FiSearch, FiX } from 'react-icons/fi'
+import { FiCheckCircle, FiAlertTriangle, FiRefreshCw, FiSearch, FiX, FiEdit, FiTrash2 } from 'react-icons/fi'
 import { getApiBase } from '../utils/config'
 
 interface DiscoveryMiddleware {
@@ -19,9 +19,11 @@ interface MiddlewaresTableProps {
   onSearchChange: (query: string) => void
   onRefresh: () => void
   isRefreshing: boolean
+  onEdit: (name: string) => void
+  onDelete: (name: string) => void
 }
 
-export const MiddlewaresTable = ({ searchQuery, onSearchChange, onRefresh, isRefreshing }: MiddlewaresTableProps) => {
+export const MiddlewaresTable = ({ searchQuery, onSearchChange, onRefresh, isRefreshing, onEdit, onDelete }: MiddlewaresTableProps) => {
   const apiBase = getApiBase()
   const { data: discovery, error, isLoading } = useSWR<DiscoveryData>(`${apiBase}/discovery`)
 
@@ -117,14 +119,17 @@ export const MiddlewaresTable = ({ searchQuery, onSearchChange, onRefresh, isRef
         <table className="w-full" style={{ tableLayout: 'fixed', borderCollapse: 'collapse', fontFamily: 'Rubik, sans-serif', borderRadius: '8px', overflow: 'hidden' }}>
           <thead className="border-b border-[#2f3d4d]" style={{ backgroundColor: 'var(--colors-01dp)' }}>
             <tr>
-              <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider" style={{ width: '30%' }}>
+              <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider" style={{ width: '25%' }}>
                 Name
               </th>
-              <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider" style={{ width: '20%' }}>
+              <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider" style={{ width: '15%' }}>
                 Type
               </th>
-              <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider" style={{ width: '20%' }}>
+              <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider" style={{ width: '15%' }}>
                 Provider
+              </th>
+              <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider" style={{ width: '15%' }}>
+                Actions
               </th>
               <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider" style={{ width: '30%' }}>
                 Status
@@ -133,60 +138,91 @@ export const MiddlewaresTable = ({ searchQuery, onSearchChange, onRefresh, isRef
           </thead>
           <tbody className="divide-y divide-[#394b5e]">
             {hasFilteredResults ? (
-              filteredMiddlewares.map((middleware, index) => (
-                <tr
-                  key={`${middleware.name}-${index}`}
-                  className="hover:bg-[hsla(206,100%,50%,0.04)] transition-colors"
-                >
-                  <td className="px-6 py-5" style={{ width: '30%' }}>
-                    <div className="text-sm font-medium text-[hsla(0,0%,100%,0.74)] truncate" title={middleware.name}>
-                      {middleware.name}
-                    </div>
-                  </td>
-                  <td className="px-6 py-5" style={{ width: '20%' }}>
-                    <span
-                      className="px-2 py-1 text-xs rounded-full"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                        color: 'rgba(255, 255, 255, 0.65)',
-                        border: '1px solid rgba(255, 255, 255, 0.65)',
-                      }}
-                    >
-                      {middleware.type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5" style={{ width: '20%' }}>
-                    <span
-                      className="px-2 py-1 text-xs rounded-full"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                        color: 'rgba(255, 255, 255, 0.65)',
-                        border: '1px solid rgba(255, 255, 255, 0.65)',
-                      }}
-                    >
-                      {middleware.provider}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5" style={{ width: '30%' }}>
-                    {middleware.status === 'enabled' ? (
-                      <div title="Enabled">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgb(48, 164, 108)' }}>
-                          <FiCheckCircle className="w-5 h-5 text-white" />
-                        </div>
+              filteredMiddlewares.map((middleware, index) => {
+                // Extract the base name without @file suffix
+                const baseName = middleware.name.replace('@file', '')
+                const isFileProvider = middleware.provider === 'file'
+                
+                return (
+                  <tr
+                    key={`${middleware.name}-${index}`}
+                    className="hover:bg-[hsla(206,100%,50%,0.04)] transition-colors"
+                  >
+                    <td className="px-6 py-5" style={{ width: '25%' }}>
+                      <div className="text-sm font-medium text-[hsla(0,0%,100%,0.74)] truncate" title={middleware.name}>
+                        {middleware.name}
                       </div>
-                    ) : (
-                      <div title="Disabled">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgb(220, 53, 69)' }}>
-                          <FiAlertTriangle className="w-5 h-5 text-white" />
+                    </td>
+                    <td className="px-6 py-5" style={{ width: '15%' }}>
+                      <span
+                        className="px-2 py-1 text-xs rounded-full"
+                        style={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                          color: 'rgba(255, 255, 255, 0.65)',
+                          border: '1px solid rgba(255, 255, 255, 0.65)',
+                        }}
+                      >
+                        {middleware.type}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5" style={{ width: '15%' }}>
+                      <span
+                        className="px-2 py-1 text-xs rounded-full"
+                        style={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                          color: 'rgba(255, 255, 255, 0.65)',
+                          border: '1px solid rgba(255, 255, 255, 0.65)',
+                        }}
+                      >
+                        {middleware.provider}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5 text-sm font-medium" style={{ width: '15%' }}>
+                      {isFileProvider ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => onEdit(baseName)}
+                            className="text-[#2aa2c1] hover:text-[#238a9f] inline-flex items-center transition-colors whitespace-nowrap"
+                          >
+                            <FiEdit className="w-4 h-4 mr-1" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => onDelete(baseName)}
+                            className="inline-flex items-center transition-colors whitespace-nowrap"
+                            style={{ color: 'rgb(220, 53, 69)' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgb(180, 43, 56)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgb(220, 53, 69)')}
+                          >
+                            <FiTrash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </button>
                         </div>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
+                      ) : (
+                        <span className="text-xs text-[hsla(0,0%,100%,0.31)]" title="Non-file middlewares cannot be edited">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-5" style={{ width: '30%' }}>
+                      {middleware.status === 'enabled' ? (
+                        <div title="Enabled">
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgb(48, 164, 108)' }}>
+                            <FiCheckCircle className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div title="Disabled">
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgb(220, 53, 69)' }}>
+                            <FiAlertTriangle className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })
             ) : (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center">
+                <td colSpan={5} className="px-6 py-8 text-center">
                   <div className="flex items-center justify-center gap-2">
                     <svg
                       stroke="currentColor"

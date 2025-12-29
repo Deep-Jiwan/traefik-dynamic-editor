@@ -98,9 +98,37 @@ func updateConfig(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/yaml - Get raw YAML configuration
 func getYAML(w http.ResponseWriter, r *http.Request) {
-	data, err := os.ReadFile(configPath)
+	filename := r.URL.Query().Get("file")
+	var filePath string
+	
+	if filename == "" {
+		// Default to main config file
+		filePath = configPath
+	} else {
+		// Security: prevent directory traversal
+		if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+			http.Error(w, "Invalid filename", http.StatusBadRequest)
+			return
+		}
+		
+		dir := filepath.Dir(configPath)
+		filePath = filepath.Join(dir, filename)
+		
+		// If the requested file doesn't exist and it starts with "middleware-",
+		// try looking for it with "chain-" prefix instead
+		if _, err := os.Stat(filePath); os.IsNotExist(err) && strings.HasPrefix(filename, "middleware-") {
+			// Try with chain- prefix
+			name := strings.TrimPrefix(filename, "middleware-")
+			alternativePath := filepath.Join(dir, "chain-"+name)
+			if _, err := os.Stat(alternativePath); err == nil {
+				filePath = alternativePath
+			}
+		}
+	}
+
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
 
@@ -532,9 +560,24 @@ func createOrUpdateMiddleware(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Write to middleware file
+	// Determine the file path - check if it exists as chain- or middleware-
 	dir := filepath.Dir(configPath)
-	middlewarePath := filepath.Join(dir, fmt.Sprintf("middleware-%s.yml", name))
+	var middlewarePath string
+
+	// Check for existing file with chain- prefix
+	chainPath := filepath.Join(dir, fmt.Sprintf("chain-%s.yml", name))
+	middlewarePrefixPath := filepath.Join(dir, fmt.Sprintf("middleware-%s.yml", name))
+
+	if _, err := os.Stat(chainPath); err == nil {
+		// File exists as chain-{name}.yml
+		middlewarePath = chainPath
+	} else if _, err := os.Stat(middlewarePrefixPath); err == nil {
+		// File exists as middleware-{name}.yml
+		middlewarePath = middlewarePrefixPath
+	} else {
+		// New file - default to middleware- prefix
+		middlewarePath = middlewarePrefixPath
+	}
 
 	if err := os.WriteFile(middlewarePath, body, 0644); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to write middleware file: %v", err), http.StatusInternalServerError)
@@ -561,10 +604,26 @@ func deleteMiddleware(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dir := filepath.Dir(configPath)
-	middlewarePath := filepath.Join(dir, fmt.Sprintf("middleware-%s.yml", name))
+	var middlewarePath string
+	var found bool
 
-	// Check if file exists
-	if _, err := os.Stat(middlewarePath); os.IsNotExist(err) {
+	// Check for chain- prefix first
+	chainPath := filepath.Join(dir, fmt.Sprintf("chain-%s.yml", name))
+	if _, err := os.Stat(chainPath); err == nil {
+		middlewarePath = chainPath
+		found = true
+	}
+
+	// Check for middleware- prefix
+	if !found {
+		middlewarePrefixPath := filepath.Join(dir, fmt.Sprintf("middleware-%s.yml", name))
+		if _, err := os.Stat(middlewarePrefixPath); err == nil {
+			middlewarePath = middlewarePrefixPath
+			found = true
+		}
+	}
+
+	if !found {
 		http.Error(w, "Middleware file not found", http.StatusNotFound)
 		return
 	}

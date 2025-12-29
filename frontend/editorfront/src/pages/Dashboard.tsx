@@ -22,9 +22,11 @@ export const Dashboard = () => {
   const [isRouterModalOpen, setIsRouterModalOpen] = useState(false)
   const [isMiddlewareModalOpen, setIsMiddlewareModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeleteMiddlewareModalOpen, setIsDeleteMiddlewareModalOpen] = useState(false)
   const [editingRouter, setEditingRouter] = useState<string | null>(null)
   const [editingMiddleware, setEditingMiddleware] = useState<string | null>(null)
   const [deletingRouter, setDeletingRouter] = useState<string | null>(null)
+  const [deletingMiddleware, setDeletingMiddleware] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [middlewareSearchQuery, setMiddlewareSearchQuery] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -89,6 +91,16 @@ export const Dashboard = () => {
     setIsDeleteModalOpen(true)
   }
 
+  const handleEditMiddleware = (name: string) => {
+    setEditingMiddleware(name)
+    setIsMiddlewareModalOpen(true)
+  }
+
+  const handleDeleteMiddleware = (name: string) => {
+    setDeletingMiddleware(name)
+    setIsDeleteMiddlewareModalOpen(true)
+  }
+
   const handleRouterSuccess = () => {
     setIsRouterModalOpen(false)
     setEditingRouter(null)
@@ -123,6 +135,27 @@ export const Dashboard = () => {
     } catch (error) {
       console.error('Error deleting router:', error)
       showToast('Failed to delete router', 'error')
+    }
+  }
+
+  const confirmDeleteMiddleware = async () => {
+    if (!deletingMiddleware) return
+
+    try {
+      const response = await fetch(`${apiBase}/middleware/${deletingMiddleware}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) throw new Error('Failed to delete middleware')
+
+      setIsDeleteMiddlewareModalOpen(false)
+      setDeletingMiddleware(null)
+      mutate(`${apiBase}/middlewares`)
+      mutate(`${apiBase}/discovery`)
+      showToast('Middleware deleted successfully', 'success')
+    } catch (error) {
+      console.error('Error deleting middleware:', error)
+      showToast('Failed to delete middleware', 'error')
     }
   }
 
@@ -350,6 +383,8 @@ export const Dashboard = () => {
               onSearchChange={setMiddlewareSearchQuery}
               onRefresh={handleRefreshStatus}
               isRefreshing={isRefreshing}
+              onEdit={handleEditMiddleware}
+              onDelete={handleDeleteMiddleware}
             />
           )}
         </div>
@@ -395,7 +430,7 @@ export const Dashboard = () => {
         />
       </Modal>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Router Confirmation Modal */}
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => {
@@ -425,6 +460,42 @@ export const Dashboard = () => {
               Cancel
             </Button>
             <Button variant="danger" className="flex-1" onClick={confirmDelete}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Middleware Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteMiddlewareModalOpen}
+        onClose={() => {
+          setIsDeleteMiddlewareModalOpen(false)
+          setDeletingMiddleware(null)
+        }}
+        title="Delete Middleware"
+      >
+        <div className="text-center">
+          <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-lg mb-4">
+            <FiAlertTriangle className="w-6 h-6 text-red-600" />
+          </div>
+          <p className="text-sm text-[hsla(0,0%,100%,0.51)] mb-6">
+            Are you sure you want to delete middleware "
+            <span className="font-semibold text-white">{deletingMiddleware}</span>"? This action cannot be
+            undone.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => {
+                setIsDeleteMiddlewareModalOpen(false)
+                setDeletingMiddleware(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="danger" className="flex-1" onClick={confirmDeleteMiddleware}>
               Delete
             </Button>
           </div>
