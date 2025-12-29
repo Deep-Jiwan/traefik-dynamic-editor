@@ -1,14 +1,5 @@
 package main
 
-// TraefikStaticConfig represents the structure of traefik.yml
-type TraefikStaticConfig struct {
-	EntryPoints map[string]EntryPoint `yaml:"entryPoints" json:"entryPoints"`
-}
-
-type EntryPoint struct {
-	Address string `yaml:"address" json:"address"`
-}
-
 // TraefikConfig represents the structure of dynamic.yml
 type TraefikConfig struct {
 	HTTP HTTPConfig `yaml:"http" json:"http"`

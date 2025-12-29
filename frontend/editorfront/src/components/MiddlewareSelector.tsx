@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { FiX, FiSearch } from 'react-icons/fi'
 import { Button } from './Button'
 import type { Middleware } from '../types/traefik'
@@ -18,6 +18,15 @@ export const MiddlewareSelector = ({
 }: MiddlewareSelectorProps) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [tempSelected, setTempSelected] = useState<Set<string>>(new Set(selected))
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Auto-focus search input when component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchInputRef.current?.focus()
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
 
   const filteredMiddlewares = useMemo(() => {
     if (!searchQuery.trim()) return available
@@ -79,6 +88,7 @@ export const MiddlewareSelector = ({
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsla(0,0%,100%,0.51)]" />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search by name, type, or provider..."
               value={searchQuery}

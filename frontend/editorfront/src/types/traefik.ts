@@ -24,10 +24,6 @@ export interface Server {
   url: string
 }
 
-export interface EntryPoint {
-  address: string
-}
-
 export interface Config {
   http: {
     routers: Record<string, Router>

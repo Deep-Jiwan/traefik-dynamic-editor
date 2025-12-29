@@ -1,26 +1,23 @@
 import { useState, useCallback } from 'react'
 import useSWR, { mutate } from 'swr'
-import { FiPlus, FiAlertTriangle, FiSearch, FiX, FiRefreshCw, FiEdit } from 'react-icons/fi'
+import { FiPlus, FiAlertTriangle, FiSearch, FiX, FiRefreshCw } from 'react-icons/fi'
 import { Helmet } from 'react-helmet-async'
 import { getApiBase } from '../utils/config'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useToast } from '../contexts/ToastContext'
-import type { Router, EntryPoint } from '../types/traefik'
+import type { Router } from '../types/traefik'
 import { ConnectionStatus } from '../components/ConnectionStatus'
 import { Button } from '../components/Button'
 import { Modal } from '../components/Modal'
 import { RouterForm } from '../components/RouterForm'
 import { RoutersTable } from '../components/RoutersTable'
 import { RouterRow } from '../components/RouterRow'
-import { EntryPointsList } from '../components/EntryPointsList'
 import { EmptyState } from '../components/EmptyState'
-import { YAMLEditor } from '../components/YAMLEditor'
 
 export const Dashboard = () => {
   const { showToast } = useToast()
   const [isRouterModalOpen, setIsRouterModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [isYAMLEditorOpen, setIsYAMLEditorOpen] = useState(false)
   const [editingRouter, setEditingRouter] = useState<string | null>(null)
   const [deletingRouter, setDeletingRouter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -38,22 +35,12 @@ export const Dashboard = () => {
     revalidateOnFocus: false,
   })
 
-  // Fetch entry points with optimized settings
-  const {
-    data: entryPoints,
-    mutate: mutateEntryPoints,
-    error: entryPointsError,
-  } = useSWR<Record<string, EntryPoint>>(`${apiBase}/entrypoints`, {
-    revalidateOnFocus: false,
-  })
-
   // WebSocket for real-time updates
   const { status: wsStatus } = useWebSocket(
     useCallback(
       (message) => {
         if (message.type === 'config-updated') {
           mutateRouters()
-          mutateEntryPoints()
           setStatusTrigger(prev => prev + 1)
           showToast('Configuration updated', 'info')
         } else if (message.type === 'discovery-updated') {
@@ -64,7 +51,7 @@ export const Dashboard = () => {
           console.log('Discovery data updated via WebSocket')
         }
       },
-      [mutateRouters, mutateEntryPoints, showToast, apiBase]
+      [mutateRouters, showToast, apiBase]
     )
   )
 
@@ -87,7 +74,6 @@ export const Dashboard = () => {
     setIsRouterModalOpen(false)
     setEditingRouter(null)
     mutateRouters()
-    mutateEntryPoints()
     setStatusTrigger(prev => prev + 1)
     showToast('Router saved successfully', 'success')
   }
@@ -105,17 +91,12 @@ export const Dashboard = () => {
       setIsDeleteModalOpen(false)
       setDeletingRouter(null)
       mutateRouters()
-      mutateEntryPoints()
       setStatusTrigger(prev => prev + 1)
       showToast('Router deleted successfully', 'success')
     } catch (error) {
       console.error('Error deleting router:', error)
       showToast('Failed to delete router', 'error')
     }
-  }
-
-  const handleAddEntryPoint = () => {
-    showToast('Entry points are defined in traefik.yml config file', 'info')
   }
 
   const handleRefreshStatus = async () => {
@@ -131,7 +112,6 @@ export const Dashboard = () => {
       // Revalidate all data sources in parallel
       await Promise.all([
         mutateRouters(), // Refresh routers
-        mutateEntryPoints(), // Refresh entry points
         mutate(`${apiBase}/discovery`), // Refresh full discovery data (includes auth + middlewares)
         mutate(`${apiBase}/middlewares`), // Refresh middlewares
       ])
@@ -192,16 +172,6 @@ export const Dashboard = () => {
             </div>
           </div>
 
-          {/* Entry Points Section */}
-          {entryPoints && (
-            <EntryPointsList entryPoints={entryPoints} onAddClick={handleAddEntryPoint} />
-          )}
-
-          {entryPointsError && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-8">
-              Failed to load entry points
-            </div>
-          )}
 
           {/* Routers Section */}
           {routersError && (
@@ -215,18 +185,7 @@ export const Dashboard = () => {
           {hasRouters && (
             <>
               {/* Search Bar & Actions */}
-              <div className="mb-4 flex justify-between gap-3">
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setIsYAMLEditorOpen(true)}
-                    className="px-3 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white hover:bg-[hsla(206,100%,50%,0.04)] transition-colors flex items-center gap-2"
-                    title="Edit dynamic configuration"
-                  >
-                    <FiEdit className="w-4 h-4" />
-                    Edit Dynamic
-                  </button>
-
-                </div>
+              <div className="mb-4 flex justify-end gap-3">
                 <div className="flex gap-3">
                   <button
                     onClick={handleRefreshStatus}
@@ -386,23 +345,6 @@ export const Dashboard = () => {
           </div>
         </div>
       </Modal>
-
-      {/* YAML Editor Modal */}
-      <YAMLEditor
-        isOpen={isYAMLEditorOpen}
-        onClose={() => setIsYAMLEditorOpen(false)}
-        onSave={() => {
-          mutateRouters()
-          mutateEntryPoints()
-          setStatusTrigger(prev => prev + 1)
-          showToast('Configuration saved successfully', 'success')
-        }}
-        title="Edit Dynamic Configuration"
-        description="Edit the dynamic.yml file from Traefik. This may break this app if not edited correctly."
-        endpoint="yaml"
-      />
-
-
     </>
   )
 }

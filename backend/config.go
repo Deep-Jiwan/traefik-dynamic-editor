@@ -102,30 +102,3 @@ func writeRouterFile(routerName string, router Router) error {
 	log.Printf("Written router file: %s", routerFilePath)
 	return nil
 }
-
-// readTraefikConfig reads Traefik static configuration from traefik.yml
-func readTraefikConfig() (*TraefikStaticConfig, error) {
-	data, err := os.ReadFile(traefikConfigPath)
-	if err != nil {
-		// If file doesn't exist, return empty config instead of error
-		if os.IsNotExist(err) {
-			log.Printf("Traefik config file not found at %s, returning empty config", traefikConfigPath)
-			return &TraefikStaticConfig{
-				EntryPoints: make(map[string]EntryPoint),
-			}, nil
-		}
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	var config TraefikStaticConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
-	}
-
-	// Initialize empty map if nil
-	if config.EntryPoints == nil {
-		config.EntryPoints = make(map[string]EntryPoint)
-	}
-
-	return &config, nil
-}

@@ -12,7 +12,6 @@ func main() {
 	// Log configuration paths on startup
 	log.Printf("Starting Traefik Dynamic Config Editor")
 	log.Printf("Dynamic config path: %s", configPath)
-	log.Printf("Traefik config path: %s", traefikConfigPath)
 	log.Printf("Traefik Dashboard URL: %s", traefikDashboardURL)
 
 	// Initialize discovery (queries Traefik API)
@@ -45,7 +44,6 @@ func main() {
 	api.HandleFunc("/yaml", updateYAML).Methods("PUT")
 	api.HandleFunc("/ping", pingHandler).Methods("GET")
 	api.HandleFunc("/health", healthHandler).Methods("GET")
-	api.HandleFunc("/entrypoints", getEntryPoints).Methods("GET")
 	api.HandleFunc("/routers", listRouters).Methods("GET")
 	api.HandleFunc("/routers/{name}", getRouter).Methods("GET")
 	api.HandleFunc("/routers/{name}", createOrUpdateRouter).Methods("POST", "PUT")

@@ -47,7 +47,6 @@ func loadEnvFile(filename string) {
 // Config holds the dynamic configuration path
 var (
 	configPath          = getEnv("DYNAMIC_CONFIG_PATH", "../dynamic/dynamic.yml")
-	traefikConfigPath   = getEnv("TRAEFIK_CONFIG_PATH", "../config/traefik.yml")
 	traefikDashboardURL = getEnv("TRAEFIK_DASHBOARD_URL", "")
 	upgrader            = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {

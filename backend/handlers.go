@@ -361,27 +361,6 @@ func deleteRouter(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "Router deleted"})
 }
 
-// GET /api/entrypoints - Get entry points from traefik.yml
-func getEntryPoints(w http.ResponseWriter, r *http.Request) {
-	staticConfig, err := readTraefikConfig()
-	if err != nil {
-		log.Printf("Error reading Traefik config from %s: %v", traefikConfigPath, err)
-		http.Error(w, fmt.Sprintf("Failed to read Traefik config: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	if staticConfig.EntryPoints == nil {
-		log.Printf("No entry points found in config file: %s", traefikConfigPath)
-		// Return empty object instead of null
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]EntryPoint{})
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(staticConfig.EntryPoints)
-}
-
 // GET /api/middlewares - Get available middlewares from discovery
 func getMiddlewares(w http.ResponseWriter, r *http.Request) {
 	discoveryData, err := ReadDiscoveryData()
