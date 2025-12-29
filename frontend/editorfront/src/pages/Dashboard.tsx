@@ -11,6 +11,7 @@ import { Button } from '../components/Button'
 import { Modal } from '../components/Modal'
 import { RouterForm } from '../components/RouterForm'
 import { MiddlewareForm } from '../components/MiddlewareForm'
+import { MiddlewaresTable } from '../components/MiddlewaresTable'
 import { RoutersTable } from '../components/RoutersTable'
 import { RouterRow } from '../components/RouterRow'
 import { EmptyState } from '../components/EmptyState'
@@ -25,6 +26,7 @@ export const Dashboard = () => {
   const [editingMiddleware, setEditingMiddleware] = useState<string | null>(null)
   const [deletingRouter, setDeletingRouter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [middlewareSearchQuery, setMiddlewareSearchQuery] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [statusTrigger, setStatusTrigger] = useState(0)
 
@@ -343,12 +345,12 @@ export const Dashboard = () => {
 
           {/* Middlewares Section */}
           {activeTab === 'middlewares' && (
-            <div className="bg-[#1e2b39] rounded-lg shadow-md p-8">
-              <div className="text-center text-[hsla(0,0%,100%,0.51)]">
-                <p className="text-lg mb-2">Middleware Management</p>
-                <p className="text-sm">Middleware table coming soon...</p>
-              </div>
-            </div>
+            <MiddlewaresTable 
+              searchQuery={middlewareSearchQuery}
+              onSearchChange={setMiddlewareSearchQuery}
+              onRefresh={handleRefreshStatus}
+              isRefreshing={isRefreshing}
+            />
           )}
         </div>
       </div>
