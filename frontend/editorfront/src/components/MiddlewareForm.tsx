@@ -4,6 +4,8 @@ import { EditorState } from '@codemirror/state'
 import { yaml as yamlMode } from '@codemirror/lang-yaml'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { lineNumbers } from '@codemirror/view'
+import { keymap } from '@codemirror/view'
+import { indentWithTab } from '@codemirror/commands'
 import { Button } from './Button'
 import { getApiBase } from '../utils/config'
 
@@ -57,6 +59,8 @@ http:
           yamlMode(),
           oneDark,
           lineNumbers(),
+          keymap.of([indentWithTab]),
+          EditorState.tabSize.of(4),
         ],
       })
 

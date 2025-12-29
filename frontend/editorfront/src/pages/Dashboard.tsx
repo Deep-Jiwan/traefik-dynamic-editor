@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import useSWR, { mutate } from 'swr'
-import { FiPlus, FiAlertTriangle, FiSearch, FiX, FiRefreshCw } from 'react-icons/fi'
+import { FiPlus, FiAlertTriangle } from 'react-icons/fi'
 import { Helmet } from 'react-helmet-async'
 import { getApiBase } from '../utils/config'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -12,8 +12,7 @@ import { Modal } from '../components/Modal'
 import { RouterForm } from '../components/RouterForm'
 import { MiddlewareForm } from '../components/MiddlewareForm'
 import { MiddlewaresTable } from '../components/MiddlewaresTable'
-import { RoutersTable } from '../components/RoutersTable'
-import { RouterRow } from '../components/RouterRow'
+import { RoutersTableView } from '../components/RoutersTableView'
 import { EmptyState } from '../components/EmptyState'
 
 export const Dashboard = () => {
@@ -29,6 +28,8 @@ export const Dashboard = () => {
   const [deletingMiddleware, setDeletingMiddleware] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [middlewareSearchQuery, setMiddlewareSearchQuery] = useState('')
+  const [routerViewMode, setRouterViewMode] = useState<'all' | 'files'>('all')
+  const [middlewareViewMode, setMiddlewareViewMode] = useState<'all' | 'files'>('all')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [statusTrigger, setStatusTrigger] = useState(0)
 
@@ -55,6 +56,8 @@ export const Dashboard = () => {
           // Revalidate discovery data when it updates
           mutate(`${apiBase}/discovery/auth`)
           mutate(`${apiBase}/middlewares`)
+          mutate(`${apiBase}/middlewares/files`)
+          mutate(`${apiBase}/middlewares/live`)
           mutate(`${apiBase}/discovery`)
           console.log('Discovery data updated via WebSocket')
         }
@@ -105,6 +108,8 @@ export const Dashboard = () => {
     setIsRouterModalOpen(false)
     setEditingRouter(null)
     mutateRouters()
+    mutate(`${apiBase}/routers/files`)
+    mutate(`${apiBase}/routers/live`)
     setStatusTrigger(prev => prev + 1)
     showToast('Router saved successfully', 'success')
   }
@@ -113,6 +118,8 @@ export const Dashboard = () => {
     setIsMiddlewareModalOpen(false)
     setEditingMiddleware(null)
     mutate(`${apiBase}/middlewares`)
+    mutate(`${apiBase}/middlewares/files`)
+    mutate(`${apiBase}/middlewares/live`)
     mutate(`${apiBase}/discovery`)
     showToast('Middleware saved successfully', 'success')
   }
@@ -130,6 +137,8 @@ export const Dashboard = () => {
       setIsDeleteModalOpen(false)
       setDeletingRouter(null)
       mutateRouters()
+      mutate(`${apiBase}/routers/files`)
+      mutate(`${apiBase}/routers/live`)
       setStatusTrigger(prev => prev + 1)
       showToast('Router deleted successfully', 'success')
     } catch (error) {
@@ -151,6 +160,8 @@ export const Dashboard = () => {
       setIsDeleteMiddlewareModalOpen(false)
       setDeletingMiddleware(null)
       mutate(`${apiBase}/middlewares`)
+      mutate(`${apiBase}/middlewares/files`)
+      mutate(`${apiBase}/middlewares/live`)
       mutate(`${apiBase}/discovery`)
       showToast('Middleware deleted successfully', 'success')
     } catch (error) {
@@ -172,8 +183,12 @@ export const Dashboard = () => {
       // Revalidate all data sources in parallel
       await Promise.all([
         mutateRouters(), // Refresh routers
+        mutate(`${apiBase}/routers/files`), // Refresh router files
+        mutate(`${apiBase}/routers/live`), // Refresh live routers
         mutate(`${apiBase}/discovery`), // Refresh full discovery data (includes auth + middlewares)
         mutate(`${apiBase}/middlewares`), // Refresh middlewares
+        mutate(`${apiBase}/middlewares/files`), // Refresh middleware files
+        mutate(`${apiBase}/middlewares/live`), // Refresh live middlewares
       ])
       setStatusTrigger(prev => prev + 1) // Trigger service status refresh
       showToast('All data refreshed', 'success')
@@ -185,25 +200,7 @@ export const Dashboard = () => {
     }
   }
 
-  const filteredRouters = routers
-    ? Object.entries(routers).filter(([name, router]) => {
-        const query = searchQuery.toLowerCase()
-        const host = router.rule.match(/Host\(`([^`]+)`\)/)?.[1] || ''
-        const entryPointsStr = router.entryPoints.join(' ')
-        const tlsStr = router.tls ? 'tls enabled' : 'tls disabled'
-        
-        return (
-          name.toLowerCase().includes(query) ||
-          host.toLowerCase().includes(query) ||
-          router.service.toLowerCase().includes(query) ||
-          entryPointsStr.toLowerCase().includes(query) ||
-          tlsStr.includes(query)
-        )
-      })
-    : []
-
   const hasRouters = routers && Object.keys(routers).length > 0
-  const hasFilteredResults = filteredRouters.length > 0
 
   return (
     <>
@@ -269,109 +266,18 @@ export const Dashboard = () => {
               {!hasRouters && !routersError && <EmptyState onAddClick={handleAddRouter} />}
 
               {hasRouters && (
-                <>
-              {/* Search Bar & Actions */}
-              <div className="mb-4 flex justify-end gap-3">
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleRefreshStatus}
-                    disabled={isRefreshing}
-                    className="px-4 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white hover:bg-[hsla(206,100%,50%,0.04)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Refresh service status"
-                  >
-                    <FiRefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  </button>
-                  <div className="relative w-64">
-                  <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[hsla(0,0%,100%,0.51)] w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Search routers..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2 bg-[#1e2b39] border border-[#2f3d4d] rounded-lg text-white placeholder-[hsla(0,0%,100%,0.51)] focus:ring-1 focus:ring-[#2aa2c1] focus:border-transparent"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[hsla(0,0%,100%,0.51)] hover:text-white transition-colors"
-                    >
-                      <FiX className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                </div>
-              </div>
-
-              {hasFilteredResults ? (
-                <RoutersTable>
-                  {filteredRouters.map(([name, router]) => (
-                    <RouterRow
-                      key={name}
-                      name={name}
-                      router={router}
-                      onEdit={handleEditRouter}
-                      onDelete={handleDeleteRouter}
-                      statusTrigger={statusTrigger}
-                    />
-                  ))}
-                </RoutersTable>
-              ) : (
-                <div className="bg-[#1e2b39] rounded-lg shadow-md overflow-x-auto">
-                  <table className="w-full min-w-max">
-                    <thead className="bg-[#1e2b39] border-b border-[#2f3d4d]">
-                      <tr>
-                        <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[100px]">
-                          Router Name
-                        </th>
-                        <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[180px]">
-                          Host
-                        </th>
-                        <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[120px]">
-                          Service
-                        </th>
-                        <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[120px]">
-                          Entry Points
-                        </th>
-                        <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[100px]">
-                          TLS
-                        </th>
-                        <th className="px-6 py-5 text-right text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[150px]">
-                          Actions
-                        </th>
-                        <th className="px-6 py-5 text-left text-xs font-medium text-[hsla(0,0%,100%,0.51)] uppercase tracking-wider min-w-[100px]">
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td colSpan={7} className="px-6 py-8 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <svg
-                              stroke="currentColor"
-                              fill="none"
-                              strokeWidth="2"
-                              viewBox="0 0 24 24"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              height="16"
-                              width="16"
-                              xmlns="http://www.w3.org/2000/svg"
-                              style={{ color: '#2aa2c1' }}
-                            >
-                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                              <line x1="12" y1="9" x2="12" y2="13"></line>
-                              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                            </svg>
-                            <span className="text-white">No data available</span>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-                </>
+                <RoutersTableView
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  onRefresh={handleRefreshStatus}
+                  isRefreshing={isRefreshing}
+                  onEdit={handleEditRouter}
+                  onDelete={handleDeleteRouter}
+                  viewMode={routerViewMode}
+                  onViewModeChange={setRouterViewMode}
+                  statusTrigger={statusTrigger}
+                  routers={routers || {}}
+                />
               )}
             </>
           )}
@@ -385,6 +291,8 @@ export const Dashboard = () => {
               isRefreshing={isRefreshing}
               onEdit={handleEditMiddleware}
               onDelete={handleDeleteMiddleware}
+              viewMode={middlewareViewMode}
+              onViewModeChange={setMiddlewareViewMode}
             />
           )}
         </div>

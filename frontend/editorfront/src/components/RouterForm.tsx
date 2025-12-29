@@ -5,7 +5,8 @@ import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { yaml as yamlMode } from '@codemirror/lang-yaml'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { lineNumbers } from '@codemirror/view'
+import { lineNumbers, keymap } from '@codemirror/view'
+import { indentWithTab } from '@codemirror/commands'
 import { Button } from './Button'
 import { Checkbox } from './Checkbox'
 import { MiddlewareSelector } from './MiddlewareSelector'
@@ -370,6 +371,8 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
               yamlMode(),
               oneDark,
               lineNumbers(),
+              keymap.of([indentWithTab]),
+              EditorState.tabSize.of(4),
             ],
           })
 

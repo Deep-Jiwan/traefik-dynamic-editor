@@ -12,9 +12,26 @@ $rootDir = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $backendDir = Join-Path $rootDir "backend"
 $frontendDir = Join-Path (Join-Path $rootDir "frontend") "editorfront"
 
-# Set environment variables for Traefik Dashboard discovery (optional)
-# Update this to your actual Traefik dashboard URL if available
-$env:TRAEFIK_DASHBOARD_URL = "http://localhost:8080"
+# Load environment variables from backend/.env file
+$envFile = Join-Path $backendDir ".env"
+if (Test-Path $envFile) {
+    Write-Host "[Config] Loading environment from .env file..." -ForegroundColor Gray
+    Get-Content $envFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line -split "=", 2
+            $key = $parts[0].Trim()
+            $value = $parts[1].Trim()
+            Set-Item -Path "env:$key" -Value $value
+            if ($key -eq "TRAEFIK_DASHBOARD_URL") {
+                Write-Host "[Config] TRAEFIK_DASHBOARD_URL: $value" -ForegroundColor Gray
+            }
+        }
+    }
+} else {
+    Write-Host "[Config] No .env file found, using defaults" -ForegroundColor Yellow
+    $env:TRAEFIK_DASHBOARD_URL = "http://localhost:8080"
+}
 
 # Track running jobs
 $jobs = @()
@@ -22,10 +39,12 @@ $jobs = @()
 try {
     # Start backend service
     Write-Host "[Backend] Starting Go service..." -ForegroundColor Cyan
-    Write-Host "[Backend] TRAEFIK_DASHBOARD_URL: $env:TRAEFIK_DASHBOARD_URL" -ForegroundColor Gray
     $backendJob = Start-Job -ScriptBlock {
         Set-Location $using:backendDir
         $env:TRAEFIK_DASHBOARD_URL = $using:env:TRAEFIK_DASHBOARD_URL
+        $env:PORT = $using:env:PORT
+        $env:DYNAMIC_CONFIG_PATH = $using:env:DYNAMIC_CONFIG_PATH
+        $env:TRAEFIK_CONFIG_PATH = $using:env:TRAEFIK_CONFIG_PATH
         & go run .
     } -Name "backend-service"
     $jobs += $backendJob

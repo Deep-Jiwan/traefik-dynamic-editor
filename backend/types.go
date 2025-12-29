@@ -6,8 +6,9 @@ type TraefikConfig struct {
 }
 
 type HTTPConfig struct {
-	Routers  map[string]Router  `yaml:"routers" json:"routers"`
-	Services map[string]Service `yaml:"services" json:"services"`
+	Routers     map[string]Router     `yaml:"routers" json:"routers"`
+	Services    map[string]Service    `yaml:"services" json:"services"`
+	Middlewares map[string]Middleware `yaml:"middlewares" json:"middlewares"`
 }
 
 type Router struct {

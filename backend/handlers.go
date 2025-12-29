@@ -171,6 +171,104 @@ func updateYAML(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"message": "YAML configuration updated"})
 }
 
+// GET /api/routers/files - List router files from dynamic folder
+func getRouterFiles(w http.ResponseWriter, r *http.Request) {
+	dir := filepath.Dir(configPath)
+	files := []RouterFile{}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to read directory: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		fileName := entry.Name()
+		// Match router-*.yml files
+		if strings.HasPrefix(fileName, "router-") && strings.HasSuffix(fileName, ".yml") {
+			filePath := filepath.Join(dir, fileName)
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Printf("Warning: Failed to read file %s: %v", filePath, err)
+				continue
+			}
+
+			// Parse YAML to extract router name (3rd line or from YAML structure)
+			var config TraefikConfig
+			routerName := ""
+			if err := yaml.Unmarshal(data, &config); err != nil {
+				log.Printf("Warning: Failed to parse file %s: %v", filePath, err)
+				// Extract from filename as fallback
+				routerName = strings.TrimPrefix(fileName, "router-")
+				routerName = strings.TrimSuffix(routerName, ".yml")
+			} else {
+				// Extract first router name from config
+				if config.HTTP.Routers != nil {
+					for name := range config.HTTP.Routers {
+						routerName = name
+						break
+					}
+				}
+				// Fallback to filename
+				if routerName == "" {
+					routerName = strings.TrimPrefix(fileName, "router-")
+					routerName = strings.TrimSuffix(routerName, ".yml")
+				}
+			}
+
+			files = append(files, RouterFile{
+				FileName:   fileName,
+				RouterName: routerName,
+			})
+		}
+	}
+
+	// Ensure we always return valid JSON (empty array if no files)
+	if files == nil {
+		files = []RouterFile{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(files)
+}
+
+// GET /api/routers/live - Get routers directly from Traefik API
+func getLiveRouters(w http.ResponseWriter, r *http.Request) {
+	dashboardURL := getEnv("TRAEFIK_DASHBOARD_URL", "")
+	if dashboardURL == "" {
+		http.Error(w, "TRAEFIK_DASHBOARD_URL not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	apiURL := dashboardURL + "/api/http/routers"
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		log.Printf("Error fetching live routers: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to fetch from Traefik API: %v", err), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("Traefik API returned status %d: %s", resp.StatusCode, string(body))
+		http.Error(w, fmt.Sprintf("Traefik API error: %d", resp.StatusCode), http.StatusBadGateway)
+		return
+	}
+
+	// Forward the response directly
+	w.Header().Set("Content-Type", "application/json")
+	io.Copy(w, resp.Body)
+}
+
 // GET /api/routers - List all routers
 func listRouters(w http.ResponseWriter, r *http.Request) {
 	config, err := readConfig()
@@ -400,6 +498,108 @@ func getMiddlewares(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(discoveryData.Middlewares)
+}
+
+// MiddlewareFile represents a middleware file with its metadata
+type MiddlewareFile struct {
+	FileName        string   `json:"fileName"`
+	MiddlewareNames []string `json:"middlewareNames"`
+}
+
+// RouterFile represents a router file with its metadata
+type RouterFile struct {
+	FileName   string `json:"fileName"`
+	RouterName string `json:"routerName"`
+}
+
+// GET /api/middlewares/files - List middleware files from dynamic folder
+func getMiddlewareFiles(w http.ResponseWriter, r *http.Request) {
+	dir := filepath.Dir(configPath)
+	files := []MiddlewareFile{}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to read directory: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		fileName := entry.Name()
+		// Match middleware-*.yml or chain-*.yml files
+		if (strings.HasPrefix(fileName, "middleware-") || strings.HasPrefix(fileName, "chain-")) && strings.HasSuffix(fileName, ".yml") {
+			filePath := filepath.Join(dir, fileName)
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Printf("Warning: Failed to read file %s: %v", filePath, err)
+				continue
+			}
+
+			// Parse YAML to extract middleware names
+			var config TraefikConfig
+			if err := yaml.Unmarshal(data, &config); err != nil {
+				log.Printf("Warning: Failed to parse file %s: %v", filePath, err)
+				continue
+			}
+
+			// Extract middleware names
+			middlewareNames := []string{}
+			if config.HTTP.Middlewares != nil {
+				for name := range config.HTTP.Middlewares {
+					middlewareNames = append(middlewareNames, name)
+				}
+			}
+
+			files = append(files, MiddlewareFile{
+				FileName:        fileName,
+				MiddlewareNames: middlewareNames,
+			})
+		}
+	}
+
+	// Ensure we always return valid JSON (empty array if no files)
+	if files == nil {
+		files = []MiddlewareFile{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(files)
+}
+
+// GET /api/middlewares/live - Get middlewares directly from Traefik API
+func getLiveMiddlewares(w http.ResponseWriter, r *http.Request) {
+	dashboardURL := getEnv("TRAEFIK_DASHBOARD_URL", "")
+	if dashboardURL == "" {
+		http.Error(w, "TRAEFIK_DASHBOARD_URL not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	apiURL := dashboardURL + "/api/http/middlewares"
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		log.Printf("Error fetching live middlewares: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to fetch from Traefik API: %v", err), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("Traefik API returned status %d: %s", resp.StatusCode, string(body))
+		http.Error(w, fmt.Sprintf("Traefik API error: %d", resp.StatusCode), http.StatusBadGateway)
+		return
+	}
+
+	// Forward the response directly
+	w.Header().Set("Content-Type", "application/json")
+	io.Copy(w, resp.Body)
 }
 
 // GET /api/ping?host=example.com - simple reachability check
