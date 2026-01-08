@@ -41,63 +41,6 @@ Current Status
 <img width="1919" height="909" alt="image" src="https://github.com/user-attachments/assets/dacec6e6-64c2-421d-80bd-9722c311fc3d" />
 
 
-## Architecture
-
-Bunch of yapp  
-
-### Backend (Go)
-- RESTful API for CRUD operations
-- File watching for real-time updates
-- WebSocket support for live notifications
-- YAML configuration parsing
-
-### Frontend (Vanilla JS + TailwindCSS)
-- No framework overhead
-- Real-time WebSocket connection
-- Responsive and modern design
-- Easy to modify and extend
-
-## API Endpoints
-
-All endpoints follow standard REST conventions for easy backend replacement:
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/config` | Get full configuration |
-| `PUT` | `/api/config` | Update full configuration |
-| `GET` | `/api/routers` | List all routers |
-| `GET` | `/api/routers/{name}` | Get specific router |
-| `POST` | `/api/routers/{name}` | Create/update router |
-| `DELETE` | `/api/routers/{name}` | Delete router |
-| `WS` | `/api/ws` | WebSocket for real-time updates |
-
-## Other
-
-### Development
-
-1. **Start the backend:**
-   ```bash
-   cd backend
-   go mod download
-   go run main.go
-   ```
-
-2. **Open in browser:**
-   ```
-   http://localhost:port
-   ```
-
-### Docker
-
-1. **Build and run:**
-   ```bash
-   docker-compose up -d
-   ```
-
-2. **Access dashboard:**
-   ```
-   http://localhost:port
-   ```
 
 ## Configuration
 
@@ -128,28 +71,6 @@ http:
         servers:
           - url: "http://traefik-editor:8080"
 ```
-
-## File Structure
-
-```
-traefik-dynamic-editor/
-├── backend/
-│   ├── main.go              # Go backend server
-│   ├── go.mod               # Go dependencies
-│   ├── go.sum               # Go dependency checksums
-│   └── Dockerfile           # Backend container
-├── frontend/
-│   └── index.html           # web side application
-├── dynamic/
-│   └── dynamic.yml          # Traefik dynamic config
-├── config/
-│   └── traefik.yml          # Traefik static config (reference)
-└── docker-compose.yml       # Docker orchestration
-```
-
-## Swapping the Backend
-
-The frontend uses standard REST API calls, making it easy to replace the Go backend if need be:
 
 
 ## License
