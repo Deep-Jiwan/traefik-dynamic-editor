@@ -59,7 +59,6 @@ export const Dashboard = () => {
           mutate(`${apiBase}/middlewares/files`)
           mutate(`${apiBase}/middlewares/live`)
           mutate(`${apiBase}/discovery`)
-          console.log('Discovery data updated via WebSocket')
         }
       },
       [mutateRouters, showToast, apiBase]

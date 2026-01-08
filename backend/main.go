@@ -39,7 +39,6 @@ func main() {
 	// API Routes
 	api := r.PathPrefix("/api").Subrouter()
 	api.HandleFunc("/config", getConfig).Methods("GET")
-	api.HandleFunc("/config", updateConfig).Methods("PUT")
 	api.HandleFunc("/yaml", getYAML).Methods("GET")
 	api.HandleFunc("/yaml", updateYAML).Methods("PUT")
 	api.HandleFunc("/ping", pingHandler).Methods("GET")
@@ -50,6 +49,7 @@ func main() {
 	api.HandleFunc("/routers/{name}", getRouter).Methods("GET")
 	api.HandleFunc("/routers/{name}", createOrUpdateRouter).Methods("POST", "PUT")
 	api.HandleFunc("/routers/{name}", deleteRouter).Methods("DELETE")
+	api.HandleFunc("/services/{name}", updateService).Methods("PUT")
 	api.HandleFunc("/middlewares", getMiddlewares).Methods("GET")
 	api.HandleFunc("/middlewares/live", getLiveMiddlewares).Methods("GET")
 	api.HandleFunc("/middlewares/files", getMiddlewareFiles).Methods("GET")

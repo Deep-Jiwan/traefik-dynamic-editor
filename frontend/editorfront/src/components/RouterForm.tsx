@@ -96,8 +96,6 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
         serviceUrl = service?.loadBalancer?.servers?.[0]?.url || ''
       }
 
-      console.log('Router Data:', { name, host, service: router.service, config: config.http?.services })
-
       setFormData({
         name,
         host,
@@ -135,23 +133,17 @@ export const RouterForm = ({ routerName, onSuccess, onCancel }: RouterFormProps)
         body: JSON.stringify(router),
       })
 
-      // Update service
-      const configResponse = await fetch(`${apiBase}/config`)
-      const config: Config = await configResponse.json()
-
-      if (!config.http.services[formData.serviceName]) {
-        config.http.services[formData.serviceName] = {
-          loadBalancer: { servers: [] },
-        }
+      // Update service only (without rewriting all routers)
+      const service = {
+        loadBalancer: {
+          servers: [{ url: formData.serviceUrl }],
+        },
       }
-      config.http.services[formData.serviceName].loadBalancer.servers = [
-        { url: formData.serviceUrl },
-      ]
 
-      await fetch(`${apiBase}/config`, {
+      await fetch(`${apiBase}/services/${formData.serviceName}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(service),
       })
 
       onSuccess()

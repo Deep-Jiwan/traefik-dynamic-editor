@@ -43,59 +43,6 @@ func getConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(config)
 }
 
-// PUT /api/config - Update full configuration by writing to individual router files
-func updateConfig(w http.ResponseWriter, r *http.Request) {
-	var config TraefikConfig
-	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	// Write each router to its own file
-	if config.HTTP.Routers != nil {
-		for routerName, router := range config.HTTP.Routers {
-			// Find the corresponding service
-			var service Service
-			if config.HTTP.Services != nil {
-				if svc, exists := config.HTTP.Services[router.Service]; exists {
-					service = svc
-				}
-			}
-
-			// Create router config with router and its service
-			routerConfig := TraefikConfig{
-				HTTP: HTTPConfig{
-					Routers: map[string]Router{
-						routerName: router,
-					},
-					Services: map[string]Service{
-						router.Service: service,
-					},
-				},
-			}
-
-			// Write to individual router file
-			data, err := yaml.Marshal(routerConfig)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("Failed to marshal router %s: %v", routerName, err), http.StatusInternalServerError)
-				return
-			}
-
-			dir := filepath.Dir(configPath)
-			routerPath := filepath.Join(dir, fmt.Sprintf("router-%s.yml", routerName))
-			if err := os.WriteFile(routerPath, data, 0644); err != nil {
-				http.Error(w, fmt.Sprintf("Failed to write router file %s: %v", routerName, err), http.StatusInternalServerError)
-				return
-			}
-
-			log.Printf("Updated router file: %s", routerPath)
-		}
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Configuration updated"})
-}
-
 // GET /api/yaml - Get raw YAML configuration
 func getYAML(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("file")
@@ -841,4 +788,64 @@ func deleteMiddleware(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Middleware deleted"})
+}
+
+// PUT /api/services/{name} - Update a specific service without rewriting all routers
+func updateService(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	name := vars["name"]
+
+	var service Service
+	if err := json.NewDecoder(r.Body).Decode(&service); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	config, err := readConfig()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Initialize services map if it doesn't exist
+	if config.HTTP.Services == nil {
+		config.HTTP.Services = make(map[string]Service)
+	}
+
+	// Update the specific service
+	config.HTTP.Services[name] = service
+
+	// Write only the individual routers that reference this service
+	for routerName, router := range config.HTTP.Routers {
+		if router.Service == name {
+			routerConfig := TraefikConfig{
+				HTTP: HTTPConfig{
+					Routers: map[string]Router{
+						routerName: router,
+					},
+					Services: map[string]Service{
+						name: service,
+					},
+				},
+			}
+
+			data, err := yaml.Marshal(routerConfig)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to marshal router %s: %v", routerName, err), http.StatusInternalServerError)
+				return
+			}
+
+			dir := filepath.Dir(configPath)
+			routerPath := filepath.Join(dir, fmt.Sprintf("router-%s.yml", routerName))
+			if err := os.WriteFile(routerPath, data, 0644); err != nil {
+				http.Error(w, fmt.Sprintf("Failed to write router file %s: %v", routerName, err), http.StatusInternalServerError)
+				return
+			}
+
+			log.Printf("Updated service %s in router file: %s", name, routerPath)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Service updated"})
 }
